@@ -1,0 +1,41 @@
+﻿@inherits LayoutComponentBase
+@using Blazored.Toast
+@using Blazored.Toast.Configuration
+@using ApplicationLayer.Services
+@using DomainLayer.Entities
+@inject ICacheService CacheService
+
+
+
+ <div class="page">
+   
+        @if (CacheService.TryGetValue<User>("User", out var data))
+        { <div class="sidebar">
+            <NavMenu />
+            </div>
+            <main class="h-100">
+                    <article class="content px-4 py-4 h-100">
+                        @Body
+                    </article>
+        </main>
+        }
+        else
+        {
+            <main class="h-100">
+                <article class="p-0 h-100">
+                    @Body
+                </article>
+
+            </main>
+        }
+</div>
+<BlazoredToasts Position="ToastPosition.TopRight"   
+                Timeout="5"
+                IconType="IconType.FontAwesome"
+                SuccessClass="success-toast-override"
+                ErrorIcon="fa fa-bug"
+                InfoIcon="fa fa-info-circle"
+                SuccessIcon="fa fa-thumbs-up"
+                WarningIcon="fa fa-warning"
+                ShowProgressBar="true"
+                />

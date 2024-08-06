@@ -1,0 +1,99 @@
+﻿@using ApplicationLayer.Services
+@using DomainLayer.Entities
+@inject ICacheService CacheService
+@inject NavigationManager NavManager
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <div class="d-flex align-items-center">
+            <img src="/images/portal_logo.png" width="30" height="30" />
+            <a class="navbar-brand text-white fw-bold " href="dashboard">PNHS Portal</a>
+        </div>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="dashboard">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="students">
+                <span class="bi bi-group-nav-menu" aria-hidden="true"></span> Students
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="attendance">
+                <span class="bi bi-attendance-nav-menu" aria-hidden="true"></span> Attendance
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="classrecord">
+                <span class="bi bi-class-records-nav-menu" aria-hidden="true"></span> Class Record
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="summary">
+                <span class="bi bi-class-records-nav-menu" aria-hidden="true"></span> Summary
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="gradelookup">
+                <span class="bi bi-grade-lookup-nav-menu" aria-hidden="true"></span> Grade Lookup
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="ranking">
+                <span class="bi bi-ranking-nav-menu" aria-hidden="true"></span> Ranking
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="graphs">
+                <span class="bi bi-graphs-nav-menu" aria-hidden="true"></span> Graphs
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="settings">
+                <span class="bi bi-grade-category-nav-menu" aria-hidden="true"></span> Settings & Resources
+            </NavLink>
+        </div>
+        @if(UserData.UserTypeID == 1)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="users">
+                    <span class="bi bi-grade-category-nav-menu" aria-hidden="true"></span> User
+                </NavLink>
+            </div>
+        }
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" @onclick="() => LogoutUser()">
+                <span class="bi bi-grade-category-nav-menu" aria-hidden="true"></span> Logout
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+@code {
+    User UserData = new();
+    protected override async Task OnInitializedAsync()
+    {
+        RetrieveFromCache<User>("User", userData => UserData = userData);
+    }
+    void RetrieveFromCache<T>(string key, Action<T> onSuccess)
+    {
+        if (CacheService.TryGetValue<T>(key, out var data))
+        {
+            onSuccess(data);
+        }
+    }
+    async Task LogoutUser()
+    {
+       await CacheService.ClearAllCache();
+       NavManager.NavigateTo("/");
+    }
+
+}

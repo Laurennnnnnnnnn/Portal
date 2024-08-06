@@ -1,0 +1,239 @@
+﻿@page "/dashboard"
+@using ApplicationLayer.Services
+@using DomainLayer.Entities
+@using NetcodeHub.Packages.Components.Validations.OnInput
+@using Microsoft.AspNetCore.Components.QuickGrid
+@inject ICacheService CacheService
+@inject IUserService UserService
+@inject IClassService ClassService
+@inject IResourcesService ResourcesService
+@inject NavigationManager NavManager
+
+
+<div class="dashboard-container h-100">
+    <div class="row shadow h-25">
+        <div class="col header-details h-100">
+            <h1 class="fs-1 fw-bold text-uppercase">Hi, @Username</h1>
+            <div>
+                <p class="fw-bold text-uppercase">School Year: <span class="text-decoration-underline">@SchoolYear</span></p>
+                <p class="fw-bold text-uppercase">Subject: <span class="text-decoration-underline">@Subject</span> </p>
+                <p class="fw-bold text-uppercase">
+                    Grade and Section:  <span class="text-decoration-underline">@GradeSection</span> 
+                    <span class="@(!string.IsNullOrWhiteSpace(GradeSection) ? "":"d-none") ms-2">
+                        <button type="button" class="btn btn-primary" data-bs-target="#studentdetails" data-bs-toggle="modal" @onclick="() => ToggleModal()">
+                            CHANGE CLASS
+                        </button>
+                    </span>
+                </p>
+            </div>
+        </div>
+        <div class="col header-image">
+                <img src="/images/students.png" class="header-image end-0" width="286" height="169" />
+        </div>
+    </div>
+   
+    <div class="row mt-3 h-75">
+        <div class="container h-100">
+            <div class="row h-100">
+                <div class="col shadow dashboard-overview h-100">
+                    <label class="fw-bold m-2">Overview</label>
+                </div>
+                <div class="col h-100">
+                    <div class="p-1 h-50">
+                        <div class="shadow dashboard-task h-100">
+                            <label class="fw-bold p-2">Task</label>
+                        </div>
+                    </div>
+                    <div class="p-1 h-50">
+                        <div class="shadow dashboard-task h-100">
+                            <label class="fw-bold p-2">Calendar</label>
+                        </div>
+                    </div>
+                </div> 
+            </div>
+        </div>
+    </div>
+</div>
+    
+
+<div class="modal fade @(isModalOpen ? "show" : "")" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true" style="@(isModalOpen ? "display: block;" : "display: none;")">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="staticBackdropLabel">Load Class</h1>
+                <p class="mt-2 text-center"><a type="button" class="link-offset-2 link-underline link-underline-opacity-0" @onclick="() => GotoResources()">Add Resources</a></p>
+            </div>
+            <div class="modal-body">
+                @if (schoolYearlist != null)
+                {
+                    <select class="form-control w-auto" id="schyear" @onchange="(e) => LoadClass2(e)">
+                        <option selected hidden>Please select SchoolYear</option>
+                        @foreach (var item in schoolYearlist)
+                        {
+                            <option value="@item.SchoolYearID">@item.SchoolYearName</option>
+                        }
+                    </select>
+
+                }
+                <QuickGrid Class="table table-hover table-responsive mt-1" Items="@ClassList" Theme="corporate">
+                        <PropertyColumn Property="c => c.ClassName" Title="Name" Class="student-namefilter align-items-center" Sortable="true"/>
+                        <PropertyColumn Property="c => c.SubjectName" Title="Subject" Sortable="true" />
+                        <TemplateColumn Context="c" Title="Actions" Class="justify-content-evenly border-0">
+                            <button type="button" class="btn btn-primary" data-bs-target="#studentdetails" data-bs-toggle="modal" @onclick="()=> LoadClass(c)">
+                                Load
+                            </button>
+                        </TemplateColumn>
+                    </QuickGrid>
+            </div>
+            <div class="modal-footer">
+                <p class="mt-2 m-auto ms-2"><a type="button" class="link-offset-2 link-underline link-underline-opacity-0" @onclick="() => GotoResources()">Create New Class</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+@if (isModalOpen)
+{
+    <div class="modal-backdrop fade show"></div>
+}
+
+
+@code {
+
+    private string _username;
+    private string _nameFilter;
+    private string _schoolYear;
+    private string _subject;
+    private string _gradeSection;
+    private User user;
+    private Class _currentClass;
+
+    public Class CurrentClass
+    {
+        get { return _currentClass; }
+        set { _currentClass = value; }
+    }
+
+
+    public User UserData
+    {
+        get { return user; }
+        set { user = value; }
+    }
+
+    public string GradeSection
+    {
+        get { return _gradeSection; }
+        set { _gradeSection = value; }
+    }
+
+    public string Subject
+    {
+        get { return _subject; }
+        set { _subject = value; }
+    }
+
+    public string SchoolYear
+    {
+        get { return _schoolYear; }
+        set { _schoolYear = value; }
+    }
+
+    public string NameFilter
+    {
+        get { return _nameFilter; }
+        set { _nameFilter = value; }
+    }
+
+    public string Username
+    {
+        get { return _username; }
+        set { _username = value; }
+    }
+    private bool isModalOpen = false;
+
+    IQueryable<SchoolYear> schoolYearlist = Enumerable.Empty<SchoolYear>().AsQueryable();
+    private int selectedyear;
+
+    IQueryable<Class> myClass = Enumerable.Empty<Class>().AsQueryable();
+    IQueryable<Class> ClassList
+    {
+        get
+        {
+            var result = myClass;
+            if (!string.IsNullOrEmpty(NameFilter))
+            {
+                result = result.Where(s => s.ClassName.Contains(NameFilter, StringComparison.CurrentCultureIgnoreCase));
+            }
+            return result;
+        }
+    }
+    List<Class> classlist = new();
+    protected override async Task OnInitializedAsync()
+    {
+        RetrieveFromCache<User>("User", userData => UserData = userData);
+        Username = UserData.Username;
+        //var classresult = await ClassService.GetClassListbyIDAsync(2);
+
+        //CacheService.Set("Class", classresult.Data, TimeSpan.FromHours(1));
+
+        @if(!CacheService.TryGetValue<Class>("Class", out var data))
+        {
+            await ToggleModal();
+        }
+        else
+        {
+            //Load dashboard data
+            RetrieveFromCache<Class>("Class", userData => CurrentClass = userData);
+            SchoolYear = CurrentClass.SchoolYearName;
+            Subject = CurrentClass.SubjectName;
+            GradeSection = CurrentClass.ClassName;
+
+        }
+
+
+        // Cache for 1 hour
+    }
+    void RetrieveFromCache<T>(string key, Action<T> onSuccess)
+    {
+        if (CacheService.TryGetValue<T>(key, out var data))
+        {
+            onSuccess(data);
+        }
+    }
+    async Task ToggleModal()
+    {
+        isModalOpen = !isModalOpen;
+        await LoadSchoolYear();
+        var classresult = await ClassService.GetClassByUserSchoolYearAsync(UserData.UserID, 0);
+        classlist = classresult.Data != null ? classresult.Data : null;
+        myClass = classlist.AsQueryable();
+        await InvokeAsync(StateHasChanged);
+        StateHasChanged();
+    }
+    async Task LoadClass(Class item)
+    {
+        var classresult = await ClassService.GetClassListbyIDAsync(item.ClassID);
+        CacheService.Set("Class", classresult.Data, TimeSpan.FromHours(24));
+        ToggleModal();
+        SchoolYear = classresult.Data.SchoolYearName;
+        Subject = classresult.Data.SubjectName;
+        GradeSection = classresult.Data.ClassName;
+
+    }
+    async Task LoadClass2(ChangeEventArgs e)
+    {
+        selectedyear = int.Parse(e.Value.ToString());
+        var classresult = await ClassService.GetClassByUserSchoolYearAsync(UserData.UserID, selectedyear);
+        myClass = classresult.Data != null ? classresult.Data.AsQueryable() : null;
+    }
+    async Task LoadSchoolYear()
+    {
+        var schoolyearresult = await ResourcesService.GetSchoolYearAsync();
+        schoolYearlist = schoolyearresult.Data != null ? schoolyearresult.Data.AsQueryable() : null;
+
+    }
+    void GotoResources()
+    {
+        NavManager.NavigateTo("/settings");
+    }
+}

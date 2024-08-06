@@ -1,0 +1,811 @@
+﻿@page "/summary"
+@using ApplicationLayer.Services
+@using Blazored.Toast.Services
+@using DomainLayer.Entities
+@using DomainLayer.Models
+@using Microsoft.Extensions.Caching.Memory
+@using NetcodeHub.Packages.Components.Validations.OnInput
+@using Microsoft.AspNetCore.Components.QuickGrid
+@inject IToastService toastService
+@inject IClassRecordService classrec
+@inject ICacheService CacheService
+@inject IResourcesService ResourcesService
+@inject IClassService ClassService
+
+
+<div class="h-100">
+    <div class="row" style="height: 8%;">
+        <div class="row h-auto">
+            <div class="col d-flex justify-content-center align-items-center">
+                <div class="w-50">
+                    @* <select class="form-control" @onchange="(e) => LoadRecordbyQuarterID(e)">
+                        @foreach (var item in quarterlist)
+                        {
+                            <option value="@item.QuarterID">@item.QuarterName</option>
+                        }
+                    </select> *@
+                </div>
+                <div class="w-50"></div>
+            </div>
+            <div class="col d-flex justify-content-center align-items-center">
+                
+            </div>
+            <div class="col m-auto">
+                
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-2 shadow" style="height: 87%;">
+        <div class="container h-100">
+            <div class="row h-100">
+                <div class="col h-100 px-0">
+                    
+                        @if (recordModel.Student is null)
+                        {
+                        
+                            <img src="/images/no_data.jpg" class="d-block my-0 mx-auto mw-100 mh-100 h-100"/>
+                       
+                        }
+                        else
+                        {
+                        <div class="mh-100 h-100 table-responsive overflow-auto m-auto w-100">
+                                <table class="table table-bordered table-hover w-100">
+                                    <thead>
+                                        <tr class="header-stick">
+                                        <th class="name-stick name-header text-center align-content-center subject-learners-header">ADVISER: @UserData.Fullname</th>
+                                                @if (subjectlist != null)
+                                                {
+                                                    foreach (var row in subjectlist)
+                                                    {
+                                                        <th class="text-center record-header text-black subject-header" style="background-color: @(row.SubjectColor)" colspan="5">
+                                                               @row.SubjectName
+                                                        </th>
+                                                    }
+                                                    
+                                                }
+                                            <th class="text-center record-average bg-quarterly align-content-center"></th>
+                                            <th class="text-center record-average bg-rank align-content-center"></th>
+                                            <th></th>
+                                        </tr>
+                                        <tr class="header-stick">
+                                        <th class="name-stick name-header text-center align-content-center fw-bold subject-learners-header">NAME OF</th>
+                                            @if (subjectlist != null)
+                                            {
+                                                foreach (var row in subjectlist)
+                                                {
+                                                   
+                                                    <th class="text-center record-header bg-written" colspan="4">
+                                                        QUARTER
+                                                    </th>
+                                                    <th class="text-center record-header align-content-center text-black" style="background-color: @(row.SubjectColor)">
+                                                        FINAL
+                                                    </th>
+                                                }
+
+                                            }
+                                            <th class="text-center record-average bg-quarterly align-content-center"></th>
+                                            <th class="text-center record-average bg-rank align-content-center">GEN</th>
+                                            <th></th>
+                                        </tr>
+                                        <tr class="header-stick">
+                                        <th class="name-stick name-header text-center align-content-center fw-bold subject-learners-header">LEARNERS</th>
+                                            @if (subjectlist != null)
+                                            {
+                                                foreach (var row in subjectlist)
+                                                {
+                                                    for (int i = 1; i <= 4; i++)
+                                                    {
+                                                        <th class="text-center record-header bg-written">
+                                                            @i
+                                                        </th>
+                                                    }
+                                                <th class="text-center record-header align-content-center text-black subject-grade-header" style="background-color: @(row.SubjectColor)">
+                                                        GRADE
+                                                    </th>
+                                                    
+                                                }
+
+                                            }
+                                        <th class="text-center record-average bg-quarterly align-content-center"></th>
+                                        <th class="text-center record-average bg-rank align-content-center">AVERAGE</th>
+                                        <th></th>
+                                        </tr>
+
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in recordModel.Student)
+                                        {
+                                            double totalgrade = 0;
+                                            int divider = 0;
+                                            double genAve = 0;
+                                            
+                                            <tr>
+                                                <td class="text-nowrap align-content-center">@($"{item.Lastname}, {item.Firstname} {item.Middlename}")</td>
+                                                
+                                                @foreach (var data in item.Subject)
+                                                {
+                                                    string color = subjectlist.Where(s => s.SubjectID == data.Value.SubjectID).Select(s => s.SubjectColor).FirstOrDefault();
+                                                    divider++;
+                                                    double subjectgrade = 0.0;
+                                                    int subdivider = 0;
+                                                    foreach (var keys in data.Value.Quarters)
+                                                    {
+                                                        subdivider++;
+                                                        subjectgrade += keys.Value.Grade;
+                                                        <td class="text-center">
+                                                            @keys.Value.Grade
+                                                        </td>
+                                                    }
+                                                    //if i insert a formula or calculation here it also displays
+                                                    totalgrade += Math.Round(subjectgrade / subdivider);
+
+                                                    <td class="text-center" style="background-color: @color">
+                                                        @(Math.Round(subjectgrade / subdivider))
+                                                    </td>
+                                                }
+
+                                                @if(divider != 0)
+                                                {
+
+                                                    genAve = Math.Round((totalgrade / divider), 2);
+                                                }
+                                                <td class="text-center">@genAve.ToString("F2")</td>
+                                                <td class="text-center bg-rank">@(Math.Round(genAve, MidpointRounding.AwayFromZero))</td>
+                                                <td></td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        }
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row" style="height: 5%;">
+        <div class="row h-auto">
+            <div class="legend d-flex flex-row mt-2">
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="classlistmodal" aria-hidden="true" aria-labelledby="classlistmodalLabel" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="classlistmodalLabel">Summary Class</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body h-100">
+                <div>
+                    <div class="row h-50">
+                        <div class="container text-center m-auto">
+                            <div class="row text-end">
+                                <div class="col m-auto">
+                                    <button type="button" class="btn btn-primary" data-bs-target="#tempsubjects" data-bs-toggle="modal">Add Subjects To Merge</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mh-100 overflow-auto h-100 mt-1">
+                            <QuickGrid Class="table table-hover table-responsive" Items="@temporaryClasslist" Theme="corporate">
+                                <PropertyColumn Property="cdata => cdata.SubjectName" Title="Name" Class="student-namefilter align-items-center" Sortable="true" />
+                                <PropertyColumn Property="cdata => cdata.ClassName" Title="Class" Sortable="true" />
+                                <PropertyColumn Property="cdata => cdata.GradeName" Title="Grade" Sortable="true" />
+                                <PropertyColumn Property="cdata => cdata.Teacher" Title="Adviser" Sortable="true" />
+                                <PropertyColumn Property="cdata => cdata.SectionName" Title="Section" Sortable="true" />
+                                <TemplateColumn Context="cdata" Title="Actions" Class="justify-content-evenly border-0">
+                                    <button class="btn text-danger" data-bs-target="#confirmationmodal" data-bs-toggle="modal">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-archive-fill" viewBox="0 0 16 16">
+                                            <path d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15zM5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1M.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8z" />
+                                        </svg>
+                                    </button>
+                                </TemplateColumn>
+                            </QuickGrid>
+                        </div>
+                    </div>
+                    <div class="row h-50">
+                        <div class="container text-center ">
+                            <div class="row text-end">
+                                <div class="col m-auto">
+                                    <button type="button" class="btn btn-primary" data-bs-target="#mainsubjects" data-bs-toggle="modal">Add Main Subjects</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mh-100 overflow-auto h-100 mt-1">
+                            <QuickGrid Class="table table-hover table-responsive" Items="@Classlist" Theme="corporate">
+                                <PropertyColumn Property="cdata => cdata.SubjectName" Title="Name" Class="student-namefilter align-items-center" Sortable="true" />
+                                <PropertyColumn Property="cdata => cdata.ClassName" Title="Class" Sortable="true" />
+                                <PropertyColumn Property="cdata => cdata.GradeName" Title="Grade" Sortable="true" />
+                                <PropertyColumn Property="cdata => cdata.Teacher" Title="Adviser" Sortable="true" />
+                                <PropertyColumn Property="cdata => cdata.SectionName" Title="Section" Sortable="true" />
+                                <TemplateColumn Context="cdata" Title="Actions" Class="justify-content-evenly border-0">
+                                    <button class="btn text-danger" data-bs-target="#confirmationmodal" data-bs-toggle="modal">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-archive-fill" viewBox="0 0 16 16">
+                                            <path d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15zM5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1M.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8z" />
+                                        </svg>
+                                    </button>
+                                </TemplateColumn>
+                            </QuickGrid>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" disabled="@IsAnyRequiredFieldEmpty()" @onclick="() => GetAllSummaryClass()">Get Summary</button>
+            </div> 
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="tempsubjects" aria-hidden="true" aria-labelledby="tempsubjectsLabel" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="tempsubjectsLabel">Merge Class</h1>
+                <button type="button" class="btn-close" data-bs-target="#classlistmodal" data-bs-toggle="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body h-100">
+                <div>
+                    <div class="mb-2 text-end">
+                        <div class="row">
+                            <div class="col m-auto w-auto">
+                                @if (schoolYearlist != null)
+                                {
+                                    <select class="form-control w-auto" id="schyear" @onchange="(e) => LoadTempClass(e)">
+                                        <option selected hidden>Please select SchoolYear</option>
+                                        @foreach (var item in schoolYearlist)
+                                        {
+                                            <option value="@item.SchoolYearID">@item.SchoolYearName</option>
+                                        }
+                                    </select>
+
+                                }
+                            </div>
+                            <div class="col m-auto w-auto">
+
+                                <input type="text" class="form-control" id="newSubjectName" @bind="newSubjectName" placeholder="Merge Subject Name" onkeypress="if(event.charCode != 8 && event.charCode != 0 &&
+                                       !((event.charCode>= 48 && event.charCode <= 57) ||
+                                (event.charCode >= 65 && event.charCode <= 90) ||
+                                (event.charCode >= 97 && event.charCode <= 122))) {
+                                event.preventDefault();
+                                }" oninput="this.value = this.value.toUpperCase();">
+
+                            </div>
+                        </div>
+                    </div>
+                    <div class="overflow-auto h-75">
+                        <QuickGrid Class="table table-hover table-responsive" Items="@searchTempClasslist" Theme="corporate">
+                            <TemplateColumn Context="cdata" Class="align-items-center">
+                                <input type="checkbox" @bind-value="cdata.IsSelected" />
+                            </TemplateColumn>
+                            <PropertyColumn Property="cdata => cdata.SubjectName" Title="Name" Class="student-namefilter align-items-center" Sortable="true" />
+                            <PropertyColumn Property="cdata => cdata.ClassName" Title="Class" Sortable="true" />
+                            <PropertyColumn Property="cdata => cdata.GradeName" Title="Grade" Sortable="true" />
+                            <PropertyColumn Property="cdata => cdata.Teacher" Title="Adviser" Sortable="true" />
+                            <PropertyColumn Property="cdata => cdata.SectionName" Title="Section" Sortable="true" />
+                        </QuickGrid>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-target="#classlistmodal" data-bs-toggle="modal" @onclick="() => AddTemporaryClass()" disabled="@IsMergeSubjDisable()">Add</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="mainsubjects" aria-hidden="true" aria-labelledby="mainsubjectsLabel" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="mainsubjectsLabel">Summary Class</h1>
+                <button type="button" class="btn-close" data-bs-target="#classlistmodal" data-bs-toggle="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body h-100">
+                <div>
+                    <div class="mb-2 text-end">
+                        <div class="row">
+                            <div class="col m-auto w-auto">
+                                @if (schoolYearlist != null)
+                                {
+                                    <select class="form-control w-auto" id="schyear" @onchange="(e) => LoadMainClass(e)">
+                                        <option selected hidden>Please select SchoolYear</option>
+                                        @foreach (var item in schoolYearlist)
+                                        {
+                                            <option value="@item.SchoolYearID">@item.SchoolYearName</option>
+                                        }
+                                    </select>
+
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="overflow-auto h-75">
+                        <QuickGrid Class="table table-hover table-responsive" Items="@searchClasslist" Theme="corporate">
+                            <TemplateColumn Context="cdata" Class="align-items-center">
+                                <input type="checkbox" @bind-value="cdata.IsSelected"/>
+                            </TemplateColumn>
+                            <PropertyColumn Property="cdata => cdata.SubjectName" Title="Name" Class="student-namefilter align-items-center" Sortable="true" />
+                            <PropertyColumn Property="cdata => cdata.ClassName" Title="Class" Sortable="true" />
+                            <PropertyColumn Property="cdata => cdata.GradeName" Title="Grade" Sortable="true" />
+                            <PropertyColumn Property="cdata => cdata.Teacher" Title="Adviser" Sortable="true" />
+                            <PropertyColumn Property="cdata => cdata.SectionName" Title="Section" Sortable="true" />
+                        </QuickGrid>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-target="#classlistmodal" data-bs-toggle="modal" @onclick="() => AddMainClass()" disabled="@IsMainSubjDisable()">Add</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="position-fixed btnadd">
+    <button class="btn btn-primary btn-studentadd" data-bs-target="#classlistmodal" data-bs-toggle="modal">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-person-fill-add" viewBox="0 0 16 16">
+            <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0" />
+            <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4" />
+        </svg>
+    </button>
+</div>
+@code {
+
+    RecordModel mainModel = new();
+    RecordModel mergeModel = new();
+
+    RecordModel recordModel = new();
+    RecordModel temporartrecordModel = new();
+    private Class _classData;
+    private User _userData;
+    private string newSubjectName = "";
+    private int mergeClassCounterID = 200;
+    private int mergeSubjectCounterID = 100;
+
+    List<Subjects> subjectlist = new();
+    List<Subjects> mainsubjectlist = new();
+    List<Subjects> mergesubjectlist = new();
+    List<Class> tempClass = new();
+    List<Class> mainClass = new();
+    IQueryable<Class> temporaryClasslist = Enumerable.Empty<Class>().AsQueryable();
+    IQueryable<Class> Classlist = Enumerable.Empty<Class>().AsQueryable();
+    IQueryable<SchoolYear> schoolYearlist = Enumerable.Empty<SchoolYear>().AsQueryable();
+    IQueryable<Class> searchTempClasslist = Enumerable.Empty<Class>().AsQueryable();
+    IQueryable<Class> searchClasslist = Enumerable.Empty<Class>().AsQueryable();
+
+    public User UserData
+    {
+        get { return _userData; }
+        set { _userData = value; }
+    }
+
+    public Class ClassData
+    {
+        get { return _classData; }
+        set { _classData = value; }
+    }
+
+
+
+    void RetrieveFromCache<T>(string key, Action<T> onSuccess)
+    {
+        if (CacheService.TryGetValue<T>(key, out var data))
+        {
+            onSuccess(data);
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        RetrieveFromCache<User>("User", userData => UserData = userData);
+        RetrieveFromCache<Class>("Class", classData => ClassData = classData);
+
+
+        await LoadSchoolYear();
+
+        //var check = await classrec.GetSummaryQuarterByStudent(2, 1);
+
+    }
+    async Task LoadSchoolYear()
+    {
+        var schoolyearresult = await ResourcesService.GetSchoolYearAsync();
+        schoolYearlist = schoolyearresult.Data != null ? schoolyearresult.Data.AsQueryable() : null;
+    }
+    async Task LoadMainClass(ChangeEventArgs e)
+    {
+        int selectedyear = int.Parse(e.Value.ToString());
+        var classresult = await ClassService.GetClassByUserSchoolYearAsync(UserData.UserID, selectedyear);
+        searchClasslist = classresult.Data != null ? classresult.Data.AsQueryable() : null;
+    }
+    async Task LoadTempClass(ChangeEventArgs e)
+    {
+        int selectedyear = int.Parse(e.Value.ToString());
+        var classresult = await ClassService.GetClassByUserSchoolYearAsync(UserData.UserID, selectedyear);
+        searchTempClasslist = classresult.Data != null ? classresult.Data.AsQueryable() : null;
+    }
+
+    async Task AddTemporaryClass()
+    {
+
+        List<Class> selectedSubjects = new();
+        foreach (var item in searchTempClasslist)
+        {
+            if (item.IsSelected) { selectedSubjects.Add(item); }
+        }
+
+        var referenceClass = selectedSubjects.First();
+
+        bool allSame = selectedSubjects.All(c =>
+            c.ClassName == referenceClass.ClassName &&
+            c.GradeID == referenceClass.GradeID &&
+            c.GradeName == referenceClass.GradeName &&
+            c.SectionID == referenceClass.SectionID &&
+            c.SectionName == referenceClass.SectionName &&
+            c.SchoolYearID == referenceClass.SchoolYearID &&
+            c.SchoolYearName == referenceClass.SchoolYearName &&
+            c.Teacher == referenceClass.Teacher);
+
+        if(!allSame){
+            toastService.ShowError("Invalid selected subject. Must be same properties");
+            return;
+        }
+
+        var newClass = new Class()
+            {
+                ClassID = mergeClassCounterID++,
+                ClassName = referenceClass.ClassName,
+                SubjectID = mergeSubjectCounterID++,
+                SubjectName = newSubjectName,
+                GradeID = referenceClass.GradeID,
+                GradeName = referenceClass.GradeName,
+                SchoolYearID = referenceClass.SchoolYearID,
+                SchoolYearName = referenceClass.SchoolYearName,
+                SectionID = referenceClass.SectionID,
+                SectionName = referenceClass.SectionName,
+                Teacher = referenceClass.Teacher
+            };
+        tempClass.Add(newClass);
+
+        var newMerge = new Subjects() //FOR TEMPORARY
+            {
+                SubjectID = newClass.SubjectID, //INCREMENT BY NUMBER OF MERGE
+                SubjectName = newClass.SubjectName
+            };
+        mergesubjectlist.Add(newMerge);
+
+
+        temporaryClasslist = tempClass.AsQueryable(); //display
+
+        mergeModel = await GetSummaryMerge(selectedSubjects, newMerge.SubjectName, newMerge.SubjectID);
+
+        //getsummary here
+    }
+
+    void AddMainClass()
+    {
+        mainClass = new List<Class>();
+        mainsubjectlist = new List<Subjects>();
+        foreach (var item in searchClasslist)
+        {
+            if (item.IsSelected) { mainClass.Add(item); }
+        }
+
+        foreach (var item in mainClass)
+        {
+            var mainsubjects = new Subjects() //FOR TEMPORARY
+                {
+                    SubjectID = item.SubjectID, //INCREMENT BY NUMBER OF MERGE
+                    SubjectName = item.SubjectName
+                };
+            mainsubjectlist.Add(mainsubjects);
+        }
+
+        Classlist = mainClass.AsQueryable();
+    }
+
+
+    async Task<RecordModel> GetSummaryMerge(List<Class> classdata, string subjectName, int subjectID)
+    {
+        var studentRecords = new RecordModel();
+        var referenceClass = classdata.First();
+
+        studentRecords = await classrec.GetQuarterSummary(referenceClass.ClassID);
+        foreach (var item in studentRecords.Student)
+        {
+            var subjDict = new Dictionary<string, Subjects>();
+            foreach (var subjclass in classdata)
+            {
+                int qrtrGrade = 0;
+                var subjectDatas = new Subjects()
+                    {
+                        SubjectID = subjclass.SubjectID,
+                        SubjectName = subjclass.SubjectName
+                    };
+                var recordDict = new Dictionary<string, RecordQuarters>();
+                var recordQuarters = await classrec.GetSummaryQuarterByStudent(subjclass.ClassID, item.StudentId);
+                foreach (var data in recordQuarters)
+                {
+                    item.TotalWrittenScore = 0;
+                    item.AverageWrittenScore = 0;
+
+                    item.TotalPerformanceScore = 0;
+                    item.AveragePerformanceScore = 0;
+
+                    item.TotalPeridiocialScore = 0;
+                    item.AveragePeriodicalScore = 0;
+
+                    if (data.Value.WrittenOutput != null && data.Value.WrittenOutput.Count != 0)
+                    {
+                        int totalWRT = 0;
+                        double wScore = 0.0;
+                        foreach (var keys in data.Value.WrittenOutput)
+                        {
+                            item.TotalWrittenScore += keys.Value.WrittenData.Score;
+                            totalWRT += keys.Value.MaxScore;
+                            wScore = keys.Value.WeightedScore;
+                        }
+                        item.AverageWrittenScore = (((double)item.TotalWrittenScore / totalWRT) * 100 * wScore);
+
+                    }
+                    if (data.Value.PerformanceOutput != null && data.Value.PerformanceOutput.Count != 0)
+                    {
+                        int totalPRF = 0;
+                        double wScore = 0.0;
+                        foreach (var keys in data.Value.PerformanceOutput)
+                        {
+                            item.TotalPerformanceScore += keys.Value.PerformanceData.Score;
+                            totalPRF += keys.Value.MaxScore;
+                            wScore = keys.Value.WeightedScore;
+                        }
+                        item.AveragePerformanceScore = (((double)item.TotalPerformanceScore / totalPRF) * 100 * wScore);
+                    }
+                    if (data.Value.PeriodicalOutput != null && data.Value.PeriodicalOutput.Count != 0)
+                    {
+
+                        int totalPRD = 0;
+                        double wScore = 0.0;
+                        foreach (var keys in data.Value.PeriodicalOutput)
+                        {
+                            item.TotalPeridiocialScore += keys.Value.PeriodicalData.Score;
+                            totalPRD += keys.Value.MaxScore;
+                            wScore = keys.Value.WeightedScore;
+                        }
+
+                        item.AveragePeriodicalScore = (((double)item.TotalPeridiocialScore / totalPRD) * 100 * wScore);
+                    }
+
+                    item.InitialGrade = item.AverageWrittenScore + item.AveragePerformanceScore + item.AveragePeriodicalScore;
+                    var grade = await classrec.GetGradeRulesAsync(item.InitialGrade);
+                    data.Value.Grade = grade.Data != 0 ? grade.Data : 0;
+                    qrtrGrade += data.Value.Grade;
+                    recordDict.Add(data.Key, data.Value);
+                }
+                subjectDatas.Quarters = recordDict;
+                subjDict.Add(subjclass.SubjectName, subjectDatas);
+            }
+            item.Subject = subjDict;
+        }
+
+        var currentRecords = studentRecords;
+
+        foreach (var data in studentRecords.Student)
+        {
+            Record student = new();
+            var newSubject = new Dictionary<string, Subjects>();
+
+
+            var subjectDatas = new Subjects()
+            {
+                SubjectID = subjectID,
+                SubjectName = subjectName,
+                Quarters = new Dictionary<string, RecordQuarters>()
+            };
+            var quartersDict = new Dictionary<string, RecordQuarters>();
+            for (int i = 1; i <= 4; i++)
+            {
+                double totalQuarter = 0.0;
+
+                var recordDatas = new RecordQuarters();
+                int divider = 0;
+                double qrtrGrade = 0.0;
+                foreach (var item in data.Subject) //LOOP ALL SUBJECTS
+                {
+                    divider++;
+
+                    foreach (var row in item.Value.Quarters) //LOOP IN QUARTERS but TRUE ONCE
+                    {
+                        if(row.Value.QuarterID == i) //GOES HERE ONLY ONCE
+                        {
+                            totalQuarter += row.Value.Grade;
+                            //recordDatas.Grade = totalQuarter;
+                        }
+
+
+                    }
+                }
+                qrtrGrade = Math.Round((totalQuarter / divider), 2);
+                recordDatas.Grade = (int)Math.Round(qrtrGrade, MidpointRounding.AwayFromZero);
+                quartersDict.Add($"Quarter{i}", recordDatas);
+            }
+            subjectDatas.Quarters = quartersDict;
+            newSubject.Add(subjectName, subjectDatas);
+            data.Subject = newSubject; // add student a subject
+        }
+
+        return studentRecords;
+    }
+
+    async Task GetAllSummaryClass()
+    {
+        RecordModel mainSubjectModel = new();
+        RecordModel mergeSubjectModel = new();
+        List<string> colors = new List<string> { "#E6B8B7", "#D8E4BC", "#CCC0DA", "#FCD5B4", "#8DB4E2", "#66FFCC", "#FFFF99", "#CCCCFF" };
+
+        if (mainClass.Count != 0)
+        {
+            mainSubjectModel = await GetSummaryGradesMain(mainClass);
+        }
+
+        if (tempClass.Count != 0)
+        {
+            mergeSubjectModel = mergeModel;
+        }
+
+        if (mainClass.Count != 0 && tempClass.Count != 0)
+        {
+            foreach (var item in mainSubjectModel.Student)
+            {
+                var matchingStudent = mergeSubjectModel.Student.FirstOrDefault(data => data.StudentId == item.StudentId);
+                if (matchingStudent != null)
+                {
+                    foreach (var row in matchingStudent.Subject)
+                    {
+                        item.Subject[row.Key] = row.Value;
+                    }
+                }
+            }
+            mainModel = mainSubjectModel;
+        }
+        else
+        {
+            mainModel = mainClass.Count != 0 ? mainSubjectModel : mergeSubjectModel;
+        }
+
+
+        foreach (var item in mainsubjectlist)
+        {
+            subjectlist.Add(item);
+        }
+        foreach (var item in mergesubjectlist)
+        {
+            subjectlist.Add(item);
+        }
+
+        int colorIndex = 0;
+        foreach (var item in subjectlist)
+        {
+            item.SubjectColor = colors[colorIndex];
+            colorIndex++;
+        }
+        recordModel = mainModel;
+
+
+    }
+
+
+    //GET SUMMARY SUBJECT GRADES
+    async Task<RecordModel> GetSummaryGradesMain(List<Class> classdata)
+    {
+        var studentRecords = new RecordModel();
+        var referenceClass = mainClass.First();
+
+        studentRecords = await classrec.GetQuarterSummary(referenceClass.ClassID);
+        foreach (var item in studentRecords.Student)
+        {
+            var subjDict = new Dictionary<string, Subjects>();
+            foreach (var subjclass in classdata)
+            {
+                int qrtrGrade = 0;
+                var subjectDatas = new Subjects()
+                    {
+                        SubjectID = subjclass.SubjectID,
+                        SubjectName = subjclass.SubjectName
+                    };
+                var recordDict = new Dictionary<string, RecordQuarters>();
+                var recordQuarters = await classrec.GetSummaryQuarterByStudent(subjclass.ClassID, item.StudentId);
+                foreach (var data in recordQuarters)
+                {
+                    item.TotalWrittenScore = 0;
+                    item.AverageWrittenScore = 0;
+
+                    item.TotalPerformanceScore = 0;
+                    item.AveragePerformanceScore = 0;
+
+                    item.TotalPeridiocialScore = 0;
+                    item.AveragePeriodicalScore = 0;
+
+                    if (data.Value.WrittenOutput != null && data.Value.WrittenOutput.Count != 0)
+                    {
+                        int totalWRT = 0;
+                        double wScore = 0.0;
+                        foreach (var keys in data.Value.WrittenOutput)
+                        {
+                            item.TotalWrittenScore += keys.Value.WrittenData.Score;
+                            totalWRT += keys.Value.MaxScore;
+                            wScore = keys.Value.WeightedScore;
+                        }
+                        item.AverageWrittenScore = (((double)item.TotalWrittenScore / totalWRT) * 100 * wScore);
+
+                    }
+                    if (data.Value.PerformanceOutput != null && data.Value.PerformanceOutput.Count != 0)
+                    {
+                        int totalPRF = 0;
+                        double wScore = 0.0;
+                        foreach (var keys in data.Value.PerformanceOutput)
+                        {
+                            item.TotalPerformanceScore += keys.Value.PerformanceData.Score;
+                            totalPRF += keys.Value.MaxScore;
+                            wScore = keys.Value.WeightedScore;
+                        }
+                        item.AveragePerformanceScore = (((double)item.TotalPerformanceScore / totalPRF) * 100 * wScore);
+                    }
+                    if (data.Value.PeriodicalOutput != null && data.Value.PeriodicalOutput.Count != 0)
+                    {
+
+                        int totalPRD = 0;
+                        double wScore = 0.0;
+                        foreach (var keys in data.Value.PeriodicalOutput)
+                        {
+                            item.TotalPeridiocialScore += keys.Value.PeriodicalData.Score;
+                            totalPRD += keys.Value.MaxScore;
+                            wScore = keys.Value.WeightedScore;
+                        }
+
+                        item.AveragePeriodicalScore = (((double)item.TotalPeridiocialScore / totalPRD) * 100 * wScore);
+                    }
+
+                    item.InitialGrade = item.AverageWrittenScore + item.AveragePerformanceScore + item.AveragePeriodicalScore;
+                    var grade = await classrec.GetGradeRulesAsync(item.InitialGrade);
+                    data.Value.Grade = grade.Data != 0 ? grade.Data : 0;
+                    qrtrGrade += data.Value.Grade;
+                    recordDict.Add(data.Key, data.Value);
+                }
+                subjectDatas.Quarters = recordDict;
+                subjDict.Add(subjclass.SubjectName, subjectDatas);
+            }
+            item.Subject = subjDict;
+        }
+        return studentRecords;
+    }
+
+    private bool IsAnyRequiredFieldEmpty()
+    {
+
+        bool disabled = true;
+        if (Classlist.Count() > 0 || temporaryClasslist.Count() > 0) { disabled = false; }
+        return disabled;
+
+    }
+
+    private bool IsMergeSubjDisable()
+    {
+
+        bool disabled = true;
+        if (!string.IsNullOrWhiteSpace(newSubjectName) && searchTempClasslist.Any(x => x.IsSelected)) { disabled = false;}
+        return disabled;
+    }
+    private bool IsMainSubjDisable()
+    {
+
+        bool disabled = true;
+        if (searchClasslist.Any(x => x.IsSelected)) { disabled = false; }
+        return disabled;
+    }
+}
+
+    

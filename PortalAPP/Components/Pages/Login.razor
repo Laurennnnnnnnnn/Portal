@@ -1,0 +1,65 @@
+﻿@page "/"
+@using ApplicationLayer.Services
+@using Blazored.Toast.Services
+@using DomainLayer.Entities
+@inject IToastService toastService
+@inject ICacheService CacheService
+@inject IUserService UserService
+@inject NavigationManager NavManager
+
+<div class="row h-100 m-0">
+    <div class="col login-background h-100">
+        <img src="/images/login_logo.png" class="login-image"/>
+    </div>
+    <div class="col h-100">
+        <div class="justify-content-center w-50 align-content-center m-auto">
+            <div class="login-container">
+                <h3>Hello again!</h3>
+                <EditForm Model="user">
+                    <DataAnnotationsValidator />
+                    <div class="row">
+                        <div class="col my-2">
+                            <form class="form-floating">
+                                <input type="text" class="form-control user-input" id="username" @bind="user.Username" placeholder="Username">
+                                <label for="username">Username</label>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col my-2">
+                            <form class="form-floating">
+                                <input type="password" class="form-control user-input" id="passcode" @bind="user.Password" placeholder="Password">
+                                <label for="passcode">Password</label>
+                            </form>
+                        </div>
+                    </div>
+                </EditForm>
+                <button type="button" disabled="@(string.IsNullOrEmpty(user.Username) || string.IsNullOrEmpty(user.Password))" class="btn btn-primary w-100 mt-2 user-input" @onclick="() => LoginUser(user)">Login</button>
+                <p class="mt-2 text-center"><a type="button" class="link-offset-2 link-underline link-underline-opacity-0" @onclick="() => GotoRegistration()">Create New User</a></p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@code {
+    User user = new();
+    async Task LoginUser(User user)
+    {
+        var userresult = await UserService.UserLogin(user.Username, user.Password);
+        if (userresult.IsSuccess)
+        {
+            CacheService.Set("User", userresult.Data, TimeSpan.FromHours(24));
+            NavManager.NavigateTo("/dashboard");
+        }
+        else
+        {
+            toastService.ShowError(userresult.ErrorMessage.ToString());
+        }
+
+    }
+    void GotoRegistration()
+    {
+        NavManager.NavigateTo("/registration");
+    }
+}

@@ -1,0 +1,879 @@
+﻿@page "/graphs"
+@using ChartJs.Blazor.BarChart
+@using ChartJs.Blazor.LineChart
+@using ApplicationLayer.Services
+@using DomainLayer.Models
+@using DomainLayer.Entities
+@inject IClassRecordService classrec
+@inject IAttendanceService AttendanceService
+@using System.Diagnostics;
+@using System.Globalization
+
+<div class="h-100">
+    <div class="row" style="height: 8%;">
+        <div class="row h-auto">
+            <div class="col d-flex justify-content-center align-items-center gap-3">
+                <div class="w-50">
+                    @if(graphList != null)
+                    {
+                        <select class="form-control" @onchange="(e) => LoadChartbyType(e)">
+                            @foreach (var item in graphList)
+                            {
+                                <option value="@item.GraphID">@item.GraphName</option>
+                            }
+                        </select>
+                    }
+                </div>
+                <div class="w-50">
+                    <button class="btn btn-primary @(isPassFailed ? "": "d-none")" @onclick="() => ReloadPassFailed()">
+                        Percentage 
+                        <span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left-right" viewBox="0 0 16 16">
+                                <path fill-rule="evenodd" d="M1 11.5a.5.5 0 0 0 .5.5h11.793l-3.147 3.146a.5.5 0 0 0 .708.708l4-4a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 11H1.5a.5.5 0 0 0-.5.5m14-7a.5.5 0 0 1-.5.5H2.707l3.147 3.146a.5.5 0 1 1-.708.708l-4-4a.5.5 0 0 1 0-.708l4-4a.5.5 0 1 1 .708.708L2.707 4H14.5a.5.5 0 0 1 .5.5" />
+                            </svg>
+                    </span>  Raw</button>
+                </div>
+            </div>
+            <div class="col d-flex justify-content-center align-items-center">
+               
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-2 shadow" style="height: 87%;">
+        <Chart Config="_config" @ref="_chart"></Chart>
+        
+    </div>
+
+    <div class="row" style="height: 5%;">
+        <div class="row h-auto">
+            
+        </div>
+    </div>
+</div>
+
+
+@code {
+    private const int InitialCount = 4;
+    private BarConfig _config;
+    private Random _rng = new Random();
+    private Chart _chart;
+    private List<GraphTypes> graphList = new();
+    private bool isPassFailed;
+    private bool toggleRaw = true;
+    SummaryOutputs summaryOuputs = new();
+    private List<string> Months = new();
+
+    private static readonly List<string> Quarters = new List<string>
+    {
+        "1st Quarter", "2nd Quarter", "3rd Quarter", "4th Quarter"
+    };
+
+    private static readonly List<string> GradeRange = new List<string>
+    {
+        "98-100", "95-97", "90-94", "85-89", "80-84", "75-79", "60-74"
+    };
+
+    public static class ChartColors
+    {
+        public static readonly string Red = "rgba(255, 99, 132, 1)";
+        public static readonly string Blue = "rgba(54, 162, 235, 1)";
+        public static readonly string Yellow = "rgba(255, 206, 86, 1)";
+        public static readonly string Green = "rgba(75, 192, 192, 1)";
+        public static readonly string Purple = "rgba(153, 102, 255, 1)";
+        public static readonly string Orange = "rgba(255, 159, 64, 1)";
+
+        public static readonly List<string> All = new List<string>
+        {
+            Red, Blue, Yellow, Green, Purple, Orange
+        };
+    }
+
+    public class GraphTypes
+    {
+        public int GraphID { get; set; }
+        public string GraphName { get; set; } = string.Empty;
+        public int ChartType { get; set; }
+    }
+
+    public class LabelProperties
+    {
+        public string LabelName { get; set; } = string.Empty;
+        public string LabelColor { get; set; } = string.Empty;
+    }
+
+    private List<string> GetMonthNames(List<string> monthsdata)
+    {
+        var names = new List<string>();
+        foreach (var item in monthsdata)
+        {
+            names.Add(DateTime.Parse(item).ToString("MMMM"));
+        }
+        return names;
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        isPassFailed = false;
+        graphList = new List<GraphTypes>
+        {
+            new GraphTypes { GraphID = 1, GraphName = "Bar - Chart of Standard Deviation per Quarter", ChartType = 1 },
+            new GraphTypes { GraphID = 2, GraphName = "Bar - Chart of Average Score of the Class per Quarter", ChartType = 1 },
+            new GraphTypes { GraphID = 3, GraphName = "Bar - Chart of MPS per Quarter", ChartType = 1 },
+            new GraphTypes { GraphID = 4, GraphName = "Bar - Chart Average Daily Attendance", ChartType = 1 },
+            new GraphTypes { GraphID = 5, GraphName = "Bar - Chart of Quarterly Grade Summary", ChartType = 1 },
+            new GraphTypes { GraphID = 6, GraphName = "Bar - Chart of Pass and Failed Students", ChartType = 1 },
+            new GraphTypes { GraphID = 7, GraphName = "Bar - Chart of Percentage of Attendance for the month", ChartType = 1 }
+        };
+        int category = 1;
+        var datalist = new List<LabelProperties>();
+        LabelProperties data = new()
+            {
+                LabelName = "STDEV",
+                LabelColor = ChartColors.Blue
+            };
+        datalist.Add(data);
+        _config = new BarConfig
+            {
+                Options = new BarOptions
+                {
+                    Responsive = true,
+                    Legend = new Legend
+                    {
+                        Position = Position.Top
+                    },
+                    Title = new OptionsTitle
+                    {
+                        Display = true,
+                        Text = graphList[0].GraphName
+                    }
+                }
+            };
+
+        List<IDataset<int>> datasetList = new();
+
+        foreach (var item in datalist)
+        {
+            var dataset = new BarDataset<int>(RandomScalingFactor(4))
+                {
+                    Label = item.LabelName,
+                    BackgroundColor = item.LabelColor,
+                    BorderColor = item.LabelColor,
+                    BorderWidth = 1
+                };
+
+            datasetList.Add(dataset);
+        }
+
+        if (category == 1) //QUARTER CATEGORY
+        {
+            foreach (var quarter in Quarters.Take(4))
+            {
+                _config.Data.Labels.Add(quarter);
+            }
+        }
+        else if (category == 2) // GRADE RANGES CATEGORY
+        {
+            foreach (var quarter in GradeRange.Take(7))
+            {
+                _config.Data.Labels.Add(quarter);
+            }
+        }
+
+        foreach (var item in datasetList)
+        {
+            _config.Data.Datasets.Add(item);
+        }
+
+        await LoadChartbyType(1);
+    }
+    async Task LoadChartbyType(int chartType)
+    {
+        int type = chartType;
+        var labels = new List<LabelProperties>();
+        bool isDouble = false;
+        isPassFailed = false;
+
+        switch (type)
+        {
+            case 1:
+                labels.Add(new LabelProperties { LabelName = "STDEV", LabelColor = ChartColors.Blue });
+                isDouble = true;
+                break;
+            case 2:
+                labels.Add(new LabelProperties { LabelName = "Average Score", LabelColor = ChartColors.Blue });
+                isDouble = true;
+
+                break;
+            case 3:
+                labels.Add(new LabelProperties { LabelName = "MPS", LabelColor = ChartColors.Blue });
+                break;
+            case 4:
+                labels.Add(new LabelProperties { LabelName = "Male", LabelColor = ChartColors.Blue });
+                labels.Add(new LabelProperties { LabelName = "Female", LabelColor = ChartColors.Red });
+                labels.Add(new LabelProperties { LabelName = "Total", LabelColor = ChartColors.Yellow });
+                isDouble = true;
+                break;
+            case 5:
+                labels.Add(new LabelProperties { LabelName = "1st Quarter", LabelColor = ChartColors.Blue });
+                labels.Add(new LabelProperties { LabelName = "2nd Quarter", LabelColor = ChartColors.Red });
+                labels.Add(new LabelProperties { LabelName = "3rd Quarter", LabelColor = ChartColors.Yellow });
+                labels.Add(new LabelProperties { LabelName = "4th Quarter", LabelColor = ChartColors.Yellow });
+                break;
+            case 6:
+                labels.Add(new LabelProperties { LabelName = "Passed", LabelColor = ChartColors.Blue });
+                labels.Add(new LabelProperties { LabelName = "Failed", LabelColor = ChartColors.Red });
+                isPassFailed = true;
+                break;
+            case 7:
+                labels.Add(new LabelProperties { LabelName = "Male", LabelColor = ChartColors.Blue });
+                labels.Add(new LabelProperties { LabelName = "Female", LabelColor = ChartColors.Red });
+                labels.Add(new LabelProperties { LabelName = "Total", LabelColor = ChartColors.Yellow });
+                isDouble = true;
+                break;
+            default:
+                break;
+        }
+
+        await ReloadGraph(graphList[type - 1].GraphName, type, labels, type == 5 ? 2 : 1, isDouble);
+    }
+    async Task LoadChartbyType(ChangeEventArgs e = null, int defaulttype = 1)
+    {
+        int type = int.Parse(e.Value.ToString());
+        var labels = new List<LabelProperties>();
+        bool isDouble = false;
+        isPassFailed = false;
+
+        switch (type)
+        {
+            case 1:
+                labels.Add(new LabelProperties { LabelName = "STDEV", LabelColor = ChartColors.Blue });
+                isDouble = true;
+                break;
+            case 2:
+                labels.Add(new LabelProperties { LabelName = "Average Score", LabelColor = ChartColors.Blue });
+                isDouble = true;
+
+                break;
+            case 3:
+                labels.Add(new LabelProperties { LabelName = "MPS", LabelColor = ChartColors.Blue });
+                break;
+            case 4:
+                labels.Add(new LabelProperties { LabelName = "Male", LabelColor = ChartColors.Blue });
+                labels.Add(new LabelProperties { LabelName = "Female", LabelColor = ChartColors.Red });
+                labels.Add(new LabelProperties { LabelName = "Total", LabelColor = ChartColors.Yellow });
+                isDouble = true;
+                break;
+            case 5:
+                labels.Add(new LabelProperties { LabelName = "1st Quarter", LabelColor = ChartColors.Blue });
+                labels.Add(new LabelProperties { LabelName = "2nd Quarter", LabelColor = ChartColors.Red });
+                labels.Add(new LabelProperties { LabelName = "3rd Quarter", LabelColor = ChartColors.Yellow });
+                labels.Add(new LabelProperties { LabelName = "4th Quarter", LabelColor = ChartColors.Yellow });
+                break;
+            case 6:
+                labels.Add(new LabelProperties { LabelName = "Passed", LabelColor = ChartColors.Blue });
+                labels.Add(new LabelProperties { LabelName = "Failed", LabelColor = ChartColors.Red });
+                isPassFailed = true;
+                break;
+            case 7:
+                labels.Add(new LabelProperties { LabelName = "Male", LabelColor = ChartColors.Blue });
+                labels.Add(new LabelProperties { LabelName = "Female", LabelColor = ChartColors.Red });
+                labels.Add(new LabelProperties { LabelName = "Total", LabelColor = ChartColors.Yellow });
+                isDouble = true;
+                break;
+            default:
+                break;
+        }
+
+        await ReloadGraph(graphList[type - 1].GraphName, type, labels, type == 5 ? 2 : 1, isDouble);
+    }
+
+
+    async Task ReloadPassFailed()
+    {
+        var labels = new List<LabelProperties>();
+        labels.Add(new LabelProperties { LabelName = "Passed", LabelColor = ChartColors.Blue });
+        labels.Add(new LabelProperties { LabelName = "Failed", LabelColor = ChartColors.Red });
+        toggleRaw = !toggleRaw;
+        await ReloadGraph(graphList[5].GraphName + (toggleRaw ? " - Raw" : " - Percentage"), 6, labels, 1, toggleRaw ? false : true);
+    }
+    async Task ReloadGraph(string graphTitle, int chartType, List<LabelProperties> labels, int category, bool isDouble)
+    {
+        int initialCount = category == 1 ? 4 : 7;
+        _config.Options.Title.Text = graphTitle;
+        _config.Data.Labels.Clear();
+        _config.Data.Datasets.Clear();
+
+        if (category == 1 && chartType != 4 && chartType != 7) // QUARTER CATEGORY
+        {
+            foreach (var month in Quarters)
+            {
+                _config.Data.Labels.Add(month);
+            }
+        }
+        else if (category == 2 && chartType != 4 && chartType != 7) // GRADE RANGES CATEGORY
+        {
+            foreach (var month in GradeRange)
+            {
+                _config.Data.Labels.Add(month);
+            }
+        }
+        else if (chartType == 4 || chartType == 7) // GRADE RANGES CATEGORY
+        {
+            var monthdata = await AttendanceService.GetMonthsPerClassAsync(2);
+            Months = monthdata.Data != null ? GetMonthNames(monthdata.Data) : new List<string>();
+            foreach (var month in Months)
+            {
+                _config.Data.Labels.Add(month);
+            }
+        }
+
+        foreach (var item in labels)
+        {
+            if(isDouble)
+            {
+                var dataset = new BarDataset<double>()
+                    {
+                        Label = item.LabelName,
+                        BackgroundColor = item.LabelColor,
+                        BorderColor = item.LabelColor,
+                        BorderWidth = 1
+                    };
+                _config.Data.Datasets.Add(dataset);
+            }
+            else
+            {
+                var dataset = new BarDataset<int>()
+                    {
+                        Label = item.LabelName,
+                        BackgroundColor = item.LabelColor,
+                        BorderColor = item.LabelColor,
+                        BorderWidth = 1
+                    };
+                _config.Data.Datasets.Add(dataset);
+            }
+        }
+
+        switch (chartType)
+        {
+            case 1:
+                await LoadChartDeviation();
+                break;
+            case 2:
+                await LoadChartAvgScore();
+                break;
+            case 3:
+                await LoadChartMps();
+                break;
+            case 4:
+                await LoadChartAttendance(true);
+                break;
+            case 5:
+                await LoadDistribution();
+                break;
+            case 6:
+                await LoadPassFailed();
+                break;
+            case 7:
+                await LoadChartAttendance(false);
+                break;
+            default:
+                break;
+        }
+
+
+
+    }
+    async Task LoadDistribution()
+    {
+
+        var tasks = new List<Task<List<int>>>
+        {
+            GetQuarterPerRange(1, 7),
+            GetQuarterPerRange(2, 7),
+            GetQuarterPerRange(3, 7),
+            GetQuarterPerRange(4, 7)
+        };
+
+        var results = await Task.WhenAll(tasks);
+
+        for (int i = 0; i < _config.Data.Datasets.Count; i++)
+        {
+            if (_config.Data.Datasets[i] is BarDataset<int> dataset)
+            {
+                dataset.Clear();
+                dataset.AddRange(results[i]);
+            }
+        }
+
+        _chart?.Update();
+
+    }
+    async Task LoadChartDeviation()
+    {
+
+        var datasets = await GetDeviations();
+
+        foreach (IDataset<double> dataset in _config.Data.Datasets)
+        {
+            int count = dataset.Count;
+            dataset.Clear();
+            foreach (var item in datasets)
+            {
+                dataset.Add(Math.Round(item, 2));
+            }
+        }
+
+        _chart?.Update();
+    }
+
+    async Task LoadChartAvgScore()
+    {
+
+        var datasets = await GetAverageScore();
+
+        foreach (IDataset<double> dataset in _config.Data.Datasets)
+        {
+            int count = dataset.Count;
+            dataset.Clear();
+            foreach (var item in datasets)
+            {
+                dataset.Add(Math.Round(item, 2));
+            }
+        }
+
+        _chart?.Update();
+    }
+    async Task LoadChartMps()
+    {
+
+        var datasets = await GetMps();
+
+        foreach (IDataset<int> dataset in _config.Data.Datasets)
+        {
+            int count = dataset.Count;
+            dataset.Clear();
+            foreach (var item in datasets)
+            {
+                dataset.Add(item);
+            }
+        }
+
+        _chart?.Update();
+    }
+
+    async Task LoadPassFailed()
+    {
+
+        if (toggleRaw)
+        {
+            var tasks = new List<Task<List<int>>>
+            {
+                GetPassPerQuarter(),
+                GetFailedPerQuarter()
+            };
+
+            var results = await Task.WhenAll(tasks);
+
+            for (int i = 0; i < _config.Data.Datasets.Count; i++)
+            {
+                if (_config.Data.Datasets[i] is BarDataset<int> dataset)
+                {
+                    dataset.Clear();
+                    foreach (var item in results[i])
+                    {
+                        dataset.Add(item);
+                    }
+                }
+            }
+
+
+        }
+        else
+        {
+            var tasks = new List<Task<List<double>>>
+            {
+                GetPassPerQuarterDouble(),
+                GetFailedPerQuarterDouble()
+            };
+
+            var results = await Task.WhenAll(tasks);
+
+            for (int i = 0; i < _config.Data.Datasets.Count; i++)
+            {
+                if (_config.Data.Datasets[i] is BarDataset<double> dataset)
+                {
+                    dataset.Clear();
+                    foreach (var item in results[i])
+                    {
+                        dataset.Add(item);
+                    }
+                }
+            }
+        }
+        _chart?.Update();
+    }
+
+    async Task LoadChartAttendance(bool isAverage)
+    {
+        var data= await AttendanceService.GetMonthsPerClassAsync(2);
+        var monthlist = data.Data != null ? data.Data : new List<string>();
+        var tasks = new List<Task<List<double>>>();
+        if (isAverage)
+        {
+            tasks = new List<Task<List<double>>>
+            {
+               GetAttendanceforAverage(1, monthlist),
+                GetAttendanceforAverage(2, monthlist),
+                GetAttendanceforAverage(3, monthlist)
+            };
+        }
+        else
+        {
+            tasks = new List<Task<List<double>>>
+            {
+               GetAttendanceforPercentage(1, monthlist),
+                GetAttendanceforPercentage(2, monthlist),
+                GetAttendanceforPercentage(3, monthlist)
+            };
+        }
+
+
+        var results = await Task.WhenAll(tasks);
+
+        for (int i = 0; i < _config.Data.Datasets.Count; i++)
+        {
+            if (_config.Data.Datasets[i] is BarDataset<double> dataset)
+            {
+                dataset.Clear();
+                foreach (var item in results[i])
+                {
+                    dataset.Add(item);
+                }
+            }
+        }
+
+        _chart?.Update();
+    }
+
+    async Task<List<double>> GetAttendanceforAverage(int type, List<string> month)
+    {
+        List<double> malelist = new();
+        List<double> femalelist = new();
+        List<double> alllist = new();
+
+        foreach (var item in month)
+        {
+            var data1 = await AttendanceService.GetAllStudentsAttendanceAsync(2, item);
+            var forGraph = data1 != null ? data1 : new AttendanceModel();
+            double maleAverage = 0.0;
+            double femaleAverage = 0.0;
+            int malePresent = 0;
+            int femalePresent = 0;
+            int totalStudent = 0;
+            var result = await AttendanceService.GetAttendanceDatesAsync(2, item);
+            int totalDailyAttendance = result.Data != null ? result.Data.Count() : 0;
+            foreach (var row in forGraph.Attendance) //list of students
+            {
+                if (row.Gender.Equals("M")) { 
+                    foreach (var attend in row.AttendanceOutput)
+                    {
+                        if (attend.Value.StatusId == 1) { malePresent++;}
+                    }
+                }
+                else if (row.Gender.Equals("F"))
+                {
+                    foreach (var attend in row.AttendanceOutput)
+                    {
+                        if (attend.Value.StatusId == 1) { femalePresent++; }
+                    }
+                }
+            }
+            totalStudent = femalePresent + malePresent;
+            malelist.Add(((double)malePresent / totalDailyAttendance));
+            femalelist.Add(((double)femalePresent / totalDailyAttendance));
+            alllist.Add(((double)totalStudent / totalDailyAttendance));
+
+
+        }
+
+        if (type == 1) { return malelist; }
+        else if (type == 2) { return femalelist; }
+        else if (type == 3) { return alllist; }
+        else { return new List<double>(); }
+
+
+    }
+    async Task<List<double>> GetAttendanceforPercentage(int type, List<string> month)
+    {
+        List<double> malelist = new();
+        List<double> femalelist = new();
+        List<double> alllist = new();
+
+        foreach (var item in month)
+        {
+            var data1 = await AttendanceService.GetAllStudentsAttendanceAsync(2, item);
+            var forGraph = data1 != null ? data1 : new AttendanceModel();
+            int malePresent = 0;
+            int femalePresent = 0;
+            int totalStudent = 0;
+            int totalMale = 0;
+            int totalFemale = 0;
+            double malePercentage = 0.0;
+            double femalePercentage = 0.0;
+            double allPercentage = 0.0;
+            var result = await AttendanceService.GetAttendanceDatesAsync(2, item);
+            int totalDailyAttendance = result.Data != null ? result.Data.Count() : 0;
+            foreach (var row in forGraph.Attendance) //list of students
+            {
+                if (row.Gender.Equals("M"))
+                {
+                    totalMale++;
+                    foreach (var attend in row.AttendanceOutput)
+                    {
+                        if (attend.Value.StatusId == 1) { malePresent++; }
+                    }
+                }
+                else if (row.Gender.Equals("F"))
+                {
+                    totalFemale++;
+                    foreach (var attend in row.AttendanceOutput)
+                    {
+                        if (attend.Value.StatusId == 1) { femalePresent++; }
+                    }
+                }
+            }
+            totalStudent = femalePresent + malePresent;
+            malePercentage = ((((double)malePresent / totalDailyAttendance)) / totalMale) * 100;
+            femalePercentage = ((((double)femalePresent / totalDailyAttendance)) / totalFemale) * 100;
+            malelist.Add(malePercentage);
+            femalelist.Add(femalePercentage);
+            alllist.Add(((malePercentage + femalePercentage) / 2));
+
+
+        }
+
+        if (type == 1) { return malelist; }
+        else if (type == 2) { return femalelist; }
+        else if (type == 3) { return alllist; }
+        else { return new List<double>(); }
+
+
+    }
+    async Task<List<int>> GetPassPerQuarter(){
+        List<int> remarkslist = new List<int>();
+        for (int i = 1; i <= 4; i++)
+        {
+            var data = await GetPassFailedforGraph(i);
+            remarkslist.Add(data.Count(_ => _.Equals("PASSED")));
+        }
+        return remarkslist;
+    }
+    async Task<List<int>> GetFailedPerQuarter()
+    {
+        List<int> remarkslist = new List<int>();
+        for (int i = 1; i <= 4; i++)
+        {
+            var data = await GetPassFailedforGraph(i);
+            remarkslist.Add(data.Count(_ => _.Equals("FAILED")));
+        }
+        return remarkslist;
+    }
+    async Task<List<double>> GetPassPerQuarterDouble()
+    {
+        List<double> remarkslist = new List<double>();
+        for (int i = 1; i <= 4; i++)
+        {
+            var data = await GetPassFailedforGraph(i);
+            remarkslist.Add(data.Any() ? Math.Round((data.Count(_ => _.Equals("PASSED")) / (double)data.Count()) * 100, 2) : 0);
+        }
+        return remarkslist;
+    }
+    async Task<List<double>> GetFailedPerQuarterDouble()
+    {
+        List<double> remarkslist = new List<double>();
+        for (int i = 1; i <= 4; i++)
+        {
+            var data = await GetPassFailedforGraph(i);
+            remarkslist.Add(data.Any() ? Math.Round((data.Count(_ => _.Equals("FAILED")) / (double)data.Count()) * 100, 2) : 0);
+        }
+        return remarkslist;
+    }
+    async Task<List<int>> GetQuarterPerRange(int quarterid, int count)
+    {
+        List<int> maleList = new List<int>();
+        var data = await GetQuarterforGraph(quarterid);
+        foreach (var item in GradeRange)
+        {
+            string[] parts = item.Split('-');
+            int start = int.Parse(parts[0]);
+            int end = int.Parse(parts[1]);
+            int countInRange = data.Count(n => n >= start && n <= end);
+            maleList.Add(countInRange);
+        }
+        return maleList;
+    }
+    async Task<List<int>> GetQuarterforGraph(int type)
+    {
+
+        var forGraph = await GetSummary(2);
+        var result = type switch
+        {
+            1 => forGraph.Student.SelectMany(s => s.Quarters.Where(q => q.Value.QuarterID == 1).Select(q => q.Value.Grade)).ToList(),
+            2 => forGraph.Student.SelectMany(s => s.Quarters.Where(q => q.Value.QuarterID == 2).Select(q => q.Value.Grade)).ToList(),
+            3 => forGraph.Student.SelectMany(s => s.Quarters.Where(q => q.Value.QuarterID == 3).Select(q => q.Value.Grade)).ToList(),
+            4 => forGraph.Student.SelectMany(s => s.Quarters.Where(q => q.Value.QuarterID == 4).Select(q => q.Value.Grade)).ToList(),
+            _ => new List<int>()
+        };
+        return result;
+    }
+    async Task<List<string>> GetPassFailedforGraph(int type)
+    {
+
+        var forGraph = await GetSummary(2);
+        var result = type switch
+        {
+            1 => forGraph.Student.SelectMany(s => s.Quarters.Where(q => q.Value.QuarterID == 1).Select(q => q.Value.GradeRemarks)).ToList(),
+            2 => forGraph.Student.SelectMany(s => s.Quarters.Where(q => q.Value.QuarterID == 2).Select(q => q.Value.GradeRemarks)).ToList(),
+            3 => forGraph.Student.SelectMany(s => s.Quarters.Where(q => q.Value.QuarterID == 3).Select(q => q.Value.GradeRemarks)).ToList(),
+            4 => forGraph.Student.SelectMany(s => s.Quarters.Where(q => q.Value.QuarterID == 4).Select(q => q.Value.GradeRemarks)).ToList(),
+            _ => new List<string>()
+        };
+        return result;
+    }
+    async Task<List<double>> GetDeviations()
+    {
+        List<double> stdev = new List<double>();
+        for (int i = 1; i <= 4; i++)
+        {
+            summaryOuputs = await classrec.GetStudentsClassSummaryAsync(2, i);
+            double devdata = 0;
+            foreach (var item in summaryOuputs.PeriodicalSumOutput)
+            {
+                devdata += item.Value.deviation;
+
+            }
+            stdev.Add(devdata);
+        }
+
+        return stdev;
+
+    }
+    async Task<List<double>> GetAverageScore()
+    {
+        List<double> avgscore = new List<double>();
+        for (int i = 1; i <= 4; i++)
+        {
+            summaryOuputs = await classrec.GetStudentsClassSummaryAsync(2, i);
+            double avgdata = 0;
+            foreach (var item in summaryOuputs.PeriodicalSumOutput)
+            {
+                avgdata += item.Value.avgScore;
+
+            }
+            avgscore.Add(avgdata);
+        }
+
+        return avgscore;
+
+    }
+    async Task<List<int>> GetMps()
+    {
+        List<int> mps = new List<int>();
+        for (int i = 1; i <= 4; i++)
+        {
+            summaryOuputs = await classrec.GetStudentsClassSummaryAsync(2, i);
+            int mpsdata = 0;
+            foreach (var item in summaryOuputs.PeriodicalSumOutput)
+            {
+                mpsdata += item.Value.mps;
+
+            }
+            mps.Add(mpsdata);
+        }
+
+        return mps;
+
+    }
+
+    private List<int> RandomScalingFactor(int count)
+    {
+        return Enumerable.Range(0, count).Select(_ => _rng.Next(0, 100)).ToList();
+    }
+
+    async Task<RecordModel> GetSummary(int classid)
+    {
+        var qtr = await classrec.GetQuarterSummary(classid);
+        foreach (var item in qtr.Student)
+        {
+            double qrtrGrade = 0;
+            foreach (var data in item.Quarters)
+            {
+                item.TotalWrittenScore = 0;
+                item.AverageWrittenScore = 0;
+
+                item.TotalPerformanceScore = 0;
+                item.AveragePerformanceScore = 0;
+
+                item.TotalPeridiocialScore = 0;
+                item.AveragePeriodicalScore = 0;
+
+                if (data.Value.WrittenOutput != null && data.Value.WrittenOutput.Count != 0)
+                {
+                    int totalWRT = 0;
+                    double wScore = 0.0;
+                    foreach (var keys in data.Value.WrittenOutput)
+                    {
+                        item.TotalWrittenScore += keys.Value.WrittenData.Score;
+                        totalWRT += keys.Value.MaxScore;
+                        wScore = keys.Value.WeightedScore;
+                    }
+                    item.AverageWrittenScore = (((double)item.TotalWrittenScore / totalWRT) * 100 * wScore);
+
+                }
+                if (data.Value.PerformanceOutput != null && data.Value.PerformanceOutput.Count != 0)
+                {
+                    int totalPRF = 0;
+                    double wScore = 0.0;
+                    foreach (var keys in data.Value.PerformanceOutput)
+                    {
+                        item.TotalPerformanceScore += keys.Value.PerformanceData.Score;
+                        totalPRF += keys.Value.MaxScore;
+                        wScore = keys.Value.WeightedScore;
+                    }
+                    item.AveragePerformanceScore = (((double)item.TotalPerformanceScore / totalPRF) * 100 * wScore);
+                }
+                if (data.Value.PeriodicalOutput != null && data.Value.PeriodicalOutput.Count != 0)
+                {
+
+                    int totalPRD = 0;
+                    double wScore = 0.0;
+                    foreach (var keys in data.Value.PeriodicalOutput)
+                    {
+                        item.TotalPeridiocialScore += keys.Value.PeriodicalData.Score;
+                        totalPRD += keys.Value.MaxScore;
+                        wScore = keys.Value.WeightedScore;
+                    }
+
+                    item.AveragePeriodicalScore = (((double)item.TotalPeridiocialScore / totalPRD) * 100 * wScore);
+                }
+
+
+                item.InitialGrade = item.AverageWrittenScore + item.AveragePerformanceScore + item.AveragePeriodicalScore;
+                var grade = await classrec.GetGradeRulesAsync(item.InitialGrade);
+                data.Value.Grade = grade.Data != 0 ? grade.Data : 0;
+                qrtrGrade += data.Value.Grade;
+                data.Value.GradeRemarks = data.Value.Grade <= 74 ? "FAILED" : "PASSED";
+            }
+            double fgrade = Math.Round((qrtrGrade / 4), 2);
+            item.FinalGrade = (int)Math.Round(fgrade);
+            item.GradeRemarks = item.FinalGrade <= 74 ? "FAILED" : "PASSED";
+
+        }
+        return qtr;
+    }
+
+    
+}
+

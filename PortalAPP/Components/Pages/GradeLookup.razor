@@ -1,0 +1,743 @@
+﻿@page "/gradelookup"
+
+@using DomainLayer.Entities
+@using DomainLayer.Models
+@using Microsoft.Extensions.Caching.Memory
+@using NetcodeHub.Packages.Components.Validations.OnInput
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ApplicationLayer.Services
+@using Blazored.Toast.Services
+@inject IToastService toastService
+@inject ICacheService CacheService
+@inject IUserService UserService
+@inject IClassService ClassService
+@inject IResourcesService ResourcesService
+@inject IStudentService StudentService
+@inject IClassRecordService ClassRecordService
+@inject IAttendanceService AttendanceService
+
+
+<div class="h-100">
+    <div class="row" style="height: 8%;">
+            <div class="col">
+            @if (studentlist != null)
+            {
+                <select class="form-control" id="stud" @onchange="(e) => LoadGradeComponents(e)">
+                    <option selected disabled>Please select Student</option>
+                    @foreach (var item in studentlist)
+                    {
+                        <option value="@item.StudentId">@($"{item.Lastname}, {item.Firstname} {(!string.IsNullOrWhiteSpace(item.Middlename) ? item.Middlename.Substring(0, 1) : "")}")</option>
+                    }
+                </select>
+            }
+            </div>
+            <div class="col"></div>
+  
+    </div>
+    <div class="row" style="height: 92%;">
+        <div class="h-100">
+            <div class="row h-50 gap-0 w-100 p-2">
+                <div class="col h-100 w-50">
+                    <div class="m-1 h-100 mh-100 shadow p-2">
+                        <label class="fw-bold">FIRST QUARTER</label>
+                        @if (recordModelQ1.Student == null)
+                        {
+                            <img src="/images/loading_blue.png" class="d-block my-0 mx-auto mw-75 mh-75 h-75" />
+                        }
+                        else
+                        {
+                            <div class="h-100 table-responsive m-auto">
+                                <table class="table table-bordered table-hover overflow-auto">
+                                    <thead>
+                                        <tr class="header-stick">
+                                            <th class="name-stick name-header text-center align-content-center">Grade Components</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">%</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">No. of <br /> Activities</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">No. of <br /> Activities Taken</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">No. of <br /> Items</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">Raw <br /> Score</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">Percentage <br /> Score</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">Weighted <br /> Score</th>
+                                            <th class="w-auto"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in recordModelQ1.Student)
+                                        {
+
+                                            foreach (var quart in item.Quarters)
+                                            {
+                                                if (quart.Value.QuarterID == 1)
+                                                {
+                                                    int woutCount = quart.Value.WrittenOutput.Count();
+                                                    int woutCtr = 0;
+                                                    double wweight = 0.0;
+                                                    int wmaxScore = 0;
+                                                    int wstudScore = 0;
+                                                    double wwScore = 0.0;
+                                                    
+                                                    <tr>
+                                                        @foreach (var wout in quart.Value.WrittenOutput)
+                                                        {
+                                                            wmaxScore += wout.Value.MaxScore;
+                                                            wweight = wout.Value.WeightedScore;
+                                                            wstudScore += wout.Value.WrittenData.Score;
+                                                            @if (wout.Value.WrittenData.WrittenDataId != 0) { woutCtr++; }
+                                                            wwScore = wout.Value.WeightedScore;
+                                                        }
+                                                        
+                                                        <td class="text-center align-content-center">Written Work</td>
+                                                        <td class="text-center align-content-center">@($"{(wweight * 100).ToString("0")} %")</td>
+                                                        <td class="text-center align-content-center">@woutCount</td>
+                                                        <td class="text-center align-content-center">@(woutCtr)</td>
+                                                        <td class="text-center align-content-center">@(wmaxScore)</td>
+                                                        <td class="text-center align-content-center">@(wstudScore)</td>
+                                                        <td class="text-center align-content-center">@(wstudScore)</td>
+                                                        <td class="text-center align-content-center">@((((double)wstudScore / wmaxScore) * 100 * wwScore).ToString("F2"))</td>
+                                                        <td></td>
+                                                    </tr>
+                                                    double woutputgrade = (((double)wstudScore / wmaxScore) * 100 * wwScore);
+                                                    int proutCount = quart.Value.PerformanceOutput.Count();
+                                                    int proutCtr = 0;
+                                                    double prweight = 0.0;
+                                                    int prmaxScore = 0;
+                                                    int prstudScore = 0;
+                                                    double prwScore = 0.0;
+                                                    <tr>
+                                                        @foreach (var prout in quart.Value.PerformanceOutput)
+                                                        {
+                                                            prmaxScore += prout.Value.MaxScore;
+                                                            prweight = prout.Value.WeightedScore;
+                                                            prstudScore += prout.Value.PerformanceData.Score;
+                                                            @if (prout.Value.PerformanceData.PerformanceDataId != 0) { proutCtr++; }
+                                                            prwScore = prout.Value.WeightedScore;
+                                                        }
+                                                        <td class="text-center align-content-center">Performance Task</td>
+                                                        <td class="text-center align-content-center">@($"{(prweight * 100).ToString("0")} %")</td>
+                                                        <td class="text-center align-content-center">@proutCount</td>
+                                                        <td class="text-center align-content-center">@(proutCtr)</td>
+                                                        <td class="text-center align-content-center">@(prmaxScore)</td>
+                                                        <td class="text-center align-content-center">@(prstudScore)</td>
+                                                        <td class="text-center align-content-center">@(prstudScore)</td>
+                                                        <td class="text-center align-content-center">@((((double)prstudScore / prmaxScore) * 100 * prwScore).ToString("F2"))</td>
+                                                        <td></td>
+                                                    </tr>
+                                                    double proutputgrade = (((double)prstudScore / prmaxScore) * 100 * prwScore);
+                                                    int pdoutCount = quart.Value.PeriodicalOutput.Count();
+                                                    int pdoutCtr = 0;
+                                                    double pdweight = 0.0;
+                                                    int pdmaxScore = 0;
+                                                    int pdstudScore = 0;
+                                                    double pdwScore = 0.0;
+                                                    <tr>
+                                                        @foreach (var pdout in quart.Value.PeriodicalOutput)
+                                                        {
+                                                            pdmaxScore += pdout.Value.MaxScore;
+                                                            pdweight = pdout.Value.WeightedScore;
+                                                            pdstudScore += pdout.Value.PeriodicalData.Score;
+                                                            @if (pdout.Value.PeriodicalData.PeriodicalDataId != 0) { pdoutCtr++; }
+                                                            pdwScore = pdout.Value.WeightedScore;
+                                                        }
+                                                        <td class="text-center align-content-center">Quarterly Asses.</td>
+                                                        <td class="text-center align-content-center">@($"{(pdweight * 100).ToString("0")} %")</td>
+                                                        <td class="text-center align-content-center">P-TEST</td>
+                                                        <td class="text-center align-content-center">@(pdoutCtr)</td>
+                                                        <td class="text-center align-content-center">@(pdmaxScore)</td>
+                                                        <td class="text-center align-content-center">@(pdstudScore)</td>
+                                                        <td class="text-center align-content-center">@(pdstudScore)</td>
+                                                        <td class="text-center align-content-center">@((((double)pdstudScore / pdmaxScore) * 100 * pdwScore).ToString("F2"))</td>
+                                                        <td></td>
+                                                    </tr>
+                                                    double pdoutputgrade = (((double)pdstudScore / pdmaxScore) * 100 * pdwScore);
+                                                    
+                                              
+                                                    <tr>
+                                                        <td class="text-center align-content-center">Quarterly Grade</td>
+                                                        <td class="text-center align-content-center" colspan="2">Initial Grade</td>
+                                                        <td class="text-center align-content-center">@((woutputgrade + proutputgrade + pdoutputgrade).ToString("F2"))</td>
+                                                        <td class="text-center align-content-center" rowspan="2"></td>
+                                                        <td class="text-center align-content-center" colspan="2">Trans. Grade</td>
+                                                        <td class="text-center align-content-center">@(quart.Value.Grade)</td>
+                                                    </tr>
+
+                                                    <tr>
+                                                        <td class="text-center align-content-center">Attendance</td>
+                                                        <td class="text-center align-content-center" colspan="2">Sessions Hold</td>
+                                                        <td class="text-center align-content-center">@quart.Value.Sessions</td>
+                                                        <td class="text-center align-content-center" colspan="2">No. of Attendance</td>
+                                                        <td class="text-center align-content-center">@quart.Value.SessionsPresent</td>
+                                                    </tr>
+                                                }
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="col h-100 w-50">
+                    <div class="m-1 h-100 mh-100 shadow p-2">
+                        <label class="fw-bold">SECOND QUARTER</label>
+                        @if (recordModelQ2.Student == null)
+                        {
+                            <img src="/images/loading_blue.png" class="d-block my-0 mx-auto mw-75 mh-75 h-75" />
+                        }
+                        else
+                        {
+                            <div class="h-100 table-responsive m-auto">
+                                <table class="table table-bordered table-hover overflow-auto">
+                                    <thead>
+                                        <tr class="header-stick">
+                                            <th class="name-stick name-header text-center align-content-center">Grade Components</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">%</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">No. of <br /> Activities</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">No. of <br /> Activities Taken</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">No. of <br /> Items</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">Raw <br /> Score</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">Percentage <br /> Score</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">Weighted <br /> Score</th>
+                                            <th class="w-auto"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in recordModelQ2.Student)
+                                        {
+
+                                            foreach (var quart in item.Quarters)
+                                            {
+                                                if (quart.Value.QuarterID == 2)
+                                                {
+                                                    int woutCount = quart.Value.WrittenOutput.Count();
+                                                    int woutCtr = 0;
+                                                    double wweight = 0.0;
+                                                    int wmaxScore = 0;
+                                                    int wstudScore = 0;
+                                                    double wwScore = 0.0;
+
+                                                    <tr>
+                                                        @foreach (var wout in quart.Value.WrittenOutput)
+                                                        {
+                                                            wmaxScore += wout.Value.MaxScore;
+                                                            wweight = wout.Value.WeightedScore;
+                                                            wstudScore += wout.Value.WrittenData.Score;
+                                                            @if (wout.Value.WrittenData.WrittenDataId != 0) { woutCtr++; }
+                                                            wwScore = wout.Value.WeightedScore;
+                                                        }
+
+                                                        <td class="text-center align-content-center">Written Work</td>
+                                                        <td class="text-center align-content-center">@($"{(wweight * 100).ToString("0")} %")</td>
+                                                        <td class="text-center align-content-center">@woutCount</td>
+                                                        <td class="text-center align-content-center">@(woutCtr)</td>
+                                                        <td class="text-center align-content-center">@(wmaxScore)</td>
+                                                        <td class="text-center align-content-center">@(wstudScore)</td>
+                                                        <td class="text-center align-content-center">@(wstudScore)</td>
+                                                        <td class="text-center align-content-center">@((((double)wstudScore / wmaxScore) * 100 * wwScore).ToString("F2"))</td>
+                                                        <td></td>
+                                                    </tr>
+                                                    double woutputgrade = (((double)wstudScore / wmaxScore) * 100 * wwScore);
+                                                    int proutCount = quart.Value.PerformanceOutput.Count();
+                                                    int proutCtr = 0;
+                                                    double prweight = 0.0;
+                                                    int prmaxScore = 0;
+                                                    int prstudScore = 0;
+                                                    double prwScore = 0.0;
+                                                    <tr>
+                                                        @foreach (var prout in quart.Value.PerformanceOutput)
+                                                        {
+                                                            prmaxScore += prout.Value.MaxScore;
+                                                            prweight = prout.Value.WeightedScore;
+                                                            prstudScore += prout.Value.PerformanceData.Score;
+                                                            @if (prout.Value.PerformanceData.PerformanceDataId != 0) { proutCtr++; }
+                                                            prwScore = prout.Value.WeightedScore;
+                                                        }
+                                                        <td class="text-center align-content-center">Performance Task</td>
+                                                        <td class="text-center align-content-center">@($"{(prweight * 100).ToString("0")} %")</td>
+                                                        <td class="text-center align-content-center">@proutCount</td>
+                                                        <td class="text-center align-content-center">@(proutCtr)</td>
+                                                        <td class="text-center align-content-center">@(prmaxScore)</td>
+                                                        <td class="text-center align-content-center">@(prstudScore)</td>
+                                                        <td class="text-center align-content-center">@(prstudScore)</td>
+                                                        <td class="text-center align-content-center">@((((double)prstudScore / prmaxScore) * 100 * prwScore).ToString("F2"))</td>
+                                                        <td></td>
+                                                    </tr>
+                                                    double proutputgrade = (((double)prstudScore / prmaxScore) * 100 * prwScore);
+                                                    int pdoutCount = quart.Value.PeriodicalOutput.Count();
+                                                    int pdoutCtr = 0;
+                                                    double pdweight = 0.0;
+                                                    int pdmaxScore = 0;
+                                                    int pdstudScore = 0;
+                                                    double pdwScore = 0.0;
+                                                    <tr>
+                                                        @foreach (var pdout in quart.Value.PeriodicalOutput)
+                                                        {
+                                                            pdmaxScore += pdout.Value.MaxScore;
+                                                            pdweight = pdout.Value.WeightedScore;
+                                                            pdstudScore += pdout.Value.PeriodicalData.Score;
+                                                            @if (pdout.Value.PeriodicalData.PeriodicalDataId != 0) { pdoutCtr++; }
+                                                            pdwScore = pdout.Value.WeightedScore;
+                                                        }
+                                                        <td class="text-center align-content-center">Quarterly Asses.</td>
+                                                        <td class="text-center align-content-center">@($"{(pdweight * 100).ToString("0")} %")</td>
+                                                        <td class="text-center align-content-center">P-TEST</td>
+                                                        <td class="text-center align-content-center">@(pdoutCtr)</td>
+                                                        <td class="text-center align-content-center">@(pdmaxScore)</td>
+                                                        <td class="text-center align-content-center">@(pdstudScore)</td>
+                                                        <td class="text-center align-content-center">@(pdstudScore)</td>
+                                                        <td class="text-center align-content-center">@((((double)pdstudScore / pdmaxScore) * 100 * pdwScore).ToString("F2"))</td>
+                                                        <td></td>
+                                                    </tr>
+                                                    double pdoutputgrade = (((double)pdstudScore / pdmaxScore) * 100 * pdwScore);
+
+
+                                                    <tr>
+                                                        <td class="text-center align-content-center">Quarterly Grade</td>
+                                                        <td class="text-center align-content-center" colspan="2">Initial Grade</td>
+                                                        <td class="text-center align-content-center">@((woutputgrade + proutputgrade + pdoutputgrade).ToString("F2"))</td>
+                                                        <td class="text-center align-content-center" rowspan="2"></td>
+                                                        <td class="text-center align-content-center" colspan="2">Trans. Grade</td>
+                                                        <td class="text-center align-content-center">@(quart.Value.Grade)</td>
+                                                    </tr>
+
+                                                    <tr>
+                                                        <td class="text-center align-content-center">Attendance</td>
+                                                        <td class="text-center align-content-center" colspan="2">Sessions Hold</td>
+                                                        <td class="text-center align-content-center">@quart.Value.Sessions</td>
+                                                        <td class="text-center align-content-center" colspan="2">No. of Attendance</td>
+                                                        <td class="text-center align-content-center">@quart.Value.SessionsPresent</td>
+                                                    </tr>
+                                                }
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="row h-50 gap-0 w-100 p-2">
+                <div class="col h-100 w-50">
+                    <div class="m-1 h-100 mh-100 shadow p-2">
+                        <label class="fw-bold">THIRD QUARTER</label>
+                        @if (recordModelQ3.Student == null)
+                        {
+                            <img src="/images/loading_blue.png" class="d-block my-0 mx-auto mw-75 mh-75 h-75" />
+                        }
+                        else
+                        {
+                            <div class="h-100 table-responsive m-auto">
+                                <table class="table table-bordered table-hover overflow-auto">
+                                    <thead>
+                                        <tr class="header-stick">
+                                            <th class="name-stick name-header text-center align-content-center">Grade Components</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">%</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">No. of <br /> Activities</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">No. of <br /> Activities Taken</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">No. of <br /> Items</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">Raw <br /> Score</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">Percentage <br /> Score</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">Weighted <br /> Score</th>
+                                            <th class="w-auto"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in recordModelQ3.Student)
+                                        {
+
+                                            foreach (var quart in item.Quarters)
+                                            {
+                                                if (quart.Value.QuarterID == 3)
+                                                {
+                                                    int woutCount = quart.Value.WrittenOutput.Count();
+                                                    int woutCtr = 0;
+                                                    double wweight = 0.0;
+                                                    int wmaxScore = 0;
+                                                    int wstudScore = 0;
+                                                    double wwScore = 0.0;
+
+                                                    <tr>
+                                                        @foreach (var wout in quart.Value.WrittenOutput)
+                                                        {
+                                                            wmaxScore += wout.Value.MaxScore;
+                                                            wweight = wout.Value.WeightedScore;
+                                                            wstudScore += wout.Value.WrittenData.Score;
+                                                            @if (wout.Value.WrittenData.WrittenDataId != 0) { woutCtr++; }
+                                                            wwScore = wout.Value.WeightedScore;
+                                                        }
+
+                                                        <td class="text-center align-content-center">Written Work</td>
+                                                        <td class="text-center align-content-center">@($"{(wweight * 100).ToString("0")} %")</td>
+                                                        <td class="text-center align-content-center">@woutCount</td>
+                                                        <td class="text-center align-content-center">@(woutCtr)</td>
+                                                        <td class="text-center align-content-center">@(wmaxScore)</td>
+                                                        <td class="text-center align-content-center">@(wstudScore)</td>
+                                                        <td class="text-center align-content-center">@(wstudScore)</td>
+                                                        <td class="text-center align-content-center">@((((double)wstudScore / wmaxScore) * 100 * wwScore).ToString("F2"))</td>
+                                                        <td></td>
+                                                    </tr>
+                                                    double woutputgrade = (((double)wstudScore / wmaxScore) * 100 * wwScore);
+                                                    int proutCount = quart.Value.PerformanceOutput.Count();
+                                                    int proutCtr = 0;
+                                                    double prweight = 0.0;
+                                                    int prmaxScore = 0;
+                                                    int prstudScore = 0;
+                                                    double prwScore = 0.0;
+                                                    <tr>
+                                                        @foreach (var prout in quart.Value.PerformanceOutput)
+                                                        {
+                                                            prmaxScore += prout.Value.MaxScore;
+                                                            prweight = prout.Value.WeightedScore;
+                                                            prstudScore += prout.Value.PerformanceData.Score;
+                                                            @if (prout.Value.PerformanceData.PerformanceDataId != 0) { proutCtr++; }
+                                                            prwScore = prout.Value.WeightedScore;
+                                                        }
+                                                        <td class="text-center align-content-center">Performance Task</td>
+                                                        <td class="text-center align-content-center">@($"{(prweight * 100).ToString("0")} %")</td>
+                                                        <td class="text-center align-content-center">@proutCount</td>
+                                                        <td class="text-center align-content-center">@(proutCtr)</td>
+                                                        <td class="text-center align-content-center">@(prmaxScore)</td>
+                                                        <td class="text-center align-content-center">@(prstudScore)</td>
+                                                        <td class="text-center align-content-center">@(prstudScore)</td>
+                                                        <td class="text-center align-content-center">@((((double)prstudScore / prmaxScore) * 100 * prwScore).ToString("F2"))</td>
+                                                        <td></td>
+                                                    </tr>
+                                                    double proutputgrade = (((double)prstudScore / prmaxScore) * 100 * prwScore);
+                                                    int pdoutCount = quart.Value.PeriodicalOutput.Count();
+                                                    int pdoutCtr = 0;
+                                                    double pdweight = 0.0;
+                                                    int pdmaxScore = 0;
+                                                    int pdstudScore = 0;
+                                                    double pdwScore = 0.0;
+                                                    <tr>
+                                                        @foreach (var pdout in quart.Value.PeriodicalOutput)
+                                                        {
+                                                            pdmaxScore += pdout.Value.MaxScore;
+                                                            pdweight = pdout.Value.WeightedScore;
+                                                            pdstudScore += pdout.Value.PeriodicalData.Score;
+                                                            @if (pdout.Value.PeriodicalData.PeriodicalDataId != 0) { pdoutCtr++; }
+                                                            pdwScore = pdout.Value.WeightedScore;
+                                                        }
+                                                        <td class="text-center align-content-center">Quarterly Asses.</td>
+                                                        <td class="text-center align-content-center">@($"{(pdweight * 100).ToString("0")} %")</td>
+                                                        <td class="text-center align-content-center">P-TEST</td>
+                                                        <td class="text-center align-content-center">@(pdoutCtr)</td>
+                                                        <td class="text-center align-content-center">@(pdmaxScore)</td>
+                                                        <td class="text-center align-content-center">@(pdstudScore)</td>
+                                                        <td class="text-center align-content-center">@(pdstudScore)</td>
+                                                        <td class="text-center align-content-center">@((((double)pdstudScore / pdmaxScore) * 100 * pdwScore).ToString("F2"))</td>
+                                                        <td></td>
+                                                    </tr>
+                                                    double pdoutputgrade = (((double)pdstudScore / pdmaxScore) * 100 * pdwScore);
+
+
+                                                    <tr>
+                                                        <td class="text-center align-content-center">Quarterly Grade</td>
+                                                        <td class="text-center align-content-center" colspan="2">Initial Grade</td>
+                                                        <td class="text-center align-content-center">@((woutputgrade + proutputgrade + pdoutputgrade).ToString("F2"))</td>
+                                                        <td class="text-center align-content-center" rowspan="2"></td>
+                                                        <td class="text-center align-content-center" colspan="2">Trans. Grade</td>
+                                                        <td class="text-center align-content-center">@(quart.Value.Grade)</td>
+                                                    </tr>
+
+                                                    <tr>
+                                                        <td class="text-center align-content-center">Attendance</td>
+                                                        <td class="text-center align-content-center" colspan="2">Sessions Hold</td>
+                                                        <td class="text-center align-content-center">@quart.Value.Sessions</td>
+                                                        <td class="text-center align-content-center" colspan="2">No. of Attendance</td>
+                                                        <td class="text-center align-content-center">@quart.Value.SessionsPresent</td>
+                                                    </tr>
+                                                }
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="col h-100 w-50">
+                    <div class="m-1 h-100 mh-100 shadow p-2">
+                        <label class="fw-bold">FOURTH QUARTER</label>
+                        @if (recordModelQ4.Student == null)
+                        {
+                            <img src="/images/loading_blue.png" class="d-block my-0 mx-auto mw-75 mh-75 h-75" />
+                        }
+                        else
+                        {
+                            <div class="h-100 table-responsive m-auto">
+                                <table class="table table-bordered table-hover overflow-auto">
+                                    <thead>
+                                        <tr class="header-stick">
+                                            <th class="name-stick name-header text-center align-content-center">Grade Components</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">%</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">No. of <br /> Activities</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">No. of <br /> Activities Taken</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">No. of <br /> Items</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">Raw <br /> Score</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">Percentage <br /> Score</th>
+                                            <th class="name-stick name-header text-center align-content-center looking-header">Weighted <br /> Score</th>
+                                            <th class="w-auto"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in recordModelQ4.Student)
+                                        {
+
+                                            foreach (var quart in item.Quarters)
+                                            {
+                                                if (quart.Value.QuarterID == 4)
+                                                {
+                                                    int woutCount = quart.Value.WrittenOutput.Count();
+                                                    int woutCtr = 0;
+                                                    double wweight = 0.0;
+                                                    int wmaxScore = 0;
+                                                    int wstudScore = 0;
+                                                    double wwScore = 0.0;
+
+                                                    <tr>
+                                                        @foreach (var wout in quart.Value.WrittenOutput)
+                                                        {
+                                                            wmaxScore += wout.Value.MaxScore;
+                                                            wweight = wout.Value.WeightedScore;
+                                                            wstudScore += wout.Value.WrittenData.Score;
+                                                            @if (wout.Value.WrittenData.WrittenDataId != 0) { woutCtr++; }
+                                                            wwScore = wout.Value.WeightedScore;
+                                                        }
+
+                                                        <td class="text-center align-content-center">Written Work</td>
+                                                        <td class="text-center align-content-center">@($"{(wweight * 100).ToString("0")} %")</td>
+                                                        <td class="text-center align-content-center">@woutCount</td>
+                                                        <td class="text-center align-content-center">@(woutCtr)</td>
+                                                        <td class="text-center align-content-center">@(wmaxScore)</td>
+                                                        <td class="text-center align-content-center">@(wstudScore)</td>
+                                                        <td class="text-center align-content-center">@(wstudScore)</td>
+                                                        <td class="text-center align-content-center">@((((double)wstudScore / wmaxScore) * 100 * wwScore).ToString("F2"))</td>
+                                                        <td></td>
+                                                    </tr>
+                                                    double woutputgrade = (((double)wstudScore / wmaxScore) * 100 * wwScore);
+                                                    int proutCount = quart.Value.PerformanceOutput.Count();
+                                                    int proutCtr = 0;
+                                                    double prweight = 0.0;
+                                                    int prmaxScore = 0;
+                                                    int prstudScore = 0;
+                                                    double prwScore = 0.0;
+                                                    <tr>
+                                                        @foreach (var prout in quart.Value.PerformanceOutput)
+                                                        {
+                                                            prmaxScore += prout.Value.MaxScore;
+                                                            prweight = prout.Value.WeightedScore;
+                                                            prstudScore += prout.Value.PerformanceData.Score;
+                                                            @if (prout.Value.PerformanceData.PerformanceDataId != 0) { proutCtr++; }
+                                                            prwScore = prout.Value.WeightedScore;
+                                                        }
+                                                        <td class="text-center align-content-center">Performance Task</td>
+                                                        <td class="text-center align-content-center">@($"{(prweight * 100).ToString("0")} %")</td>
+                                                        <td class="text-center align-content-center">@proutCount</td>
+                                                        <td class="text-center align-content-center">@(proutCtr)</td>
+                                                        <td class="text-center align-content-center">@(prmaxScore)</td>
+                                                        <td class="text-center align-content-center">@(prstudScore)</td>
+                                                        <td class="text-center align-content-center">@(prstudScore)</td>
+                                                        <td class="text-center align-content-center">@((((double)prstudScore / prmaxScore) * 100 * prwScore).ToString("F2"))</td>
+                                                        <td></td>
+                                                    </tr>
+                                                    double proutputgrade = (((double)prstudScore / prmaxScore) * 100 * prwScore);
+                                                    int pdoutCount = quart.Value.PeriodicalOutput.Count();
+                                                    int pdoutCtr = 0;
+                                                    double pdweight = 0.0;
+                                                    int pdmaxScore = 0;
+                                                    int pdstudScore = 0;
+                                                    double pdwScore = 0.0;
+                                                    <tr>
+                                                        @foreach (var pdout in quart.Value.PeriodicalOutput)
+                                                        {
+                                                            pdmaxScore += pdout.Value.MaxScore;
+                                                            pdweight = pdout.Value.WeightedScore;
+                                                            pdstudScore += pdout.Value.PeriodicalData.Score;
+                                                            @if (pdout.Value.PeriodicalData.PeriodicalDataId != 0) { pdoutCtr++; }
+                                                            pdwScore = pdout.Value.WeightedScore;
+                                                        }
+                                                        <td class="text-center align-content-center">Quarterly Asses.</td>
+                                                        <td class="text-center align-content-center">@($"{(pdweight * 100).ToString("0")} %")</td>
+                                                        <td class="text-center align-content-center">P-TEST</td>
+                                                        <td class="text-center align-content-center">@(pdoutCtr)</td>
+                                                        <td class="text-center align-content-center">@(pdmaxScore)</td>
+                                                        <td class="text-center align-content-center">@(pdstudScore)</td>
+                                                        <td class="text-center align-content-center">@(pdstudScore)</td>
+                                                        <td class="text-center align-content-center">@((((double)pdstudScore / pdmaxScore) * 100 * pdwScore).ToString("F2"))</td>
+                                                        <td></td>
+                                                    </tr>
+                                                    double pdoutputgrade = (((double)pdstudScore / pdmaxScore) * 100 * pdwScore);
+
+
+                                                    <tr>
+                                                        <td class="text-center align-content-center">Quarterly Grade</td>
+                                                        <td class="text-center align-content-center" colspan="2">Initial Grade</td>
+                                                        <td class="text-center align-content-center">@((woutputgrade + proutputgrade + pdoutputgrade).ToString("F2"))</td>
+                                                        <td class="text-center align-content-center" rowspan="2"></td>
+                                                        <td class="text-center align-content-center" colspan="2">Trans. Grade</td>
+                                                        <td class="text-center align-content-center">@(quart.Value.Grade)</td>
+                                                    </tr>
+
+                                                    <tr>
+                                                        <td class="text-center align-content-center">Attendance</td>
+                                                        <td class="text-center align-content-center" colspan="2">Sessions Hold</td>
+                                                        <td class="text-center align-content-center">@quart.Value.Sessions</td>
+                                                        <td class="text-center align-content-center" colspan="2">No. of Attendance</td>
+                                                        <td class="text-center align-content-center">@quart.Value.SessionsPresent</td>
+                                                    </tr>
+                                                }
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    List<StudentData> studentlist = new();
+    Class ClassData = new();
+    User UserData = new();
+    RecordModel recordModel = new();
+    RecordModel recordModelQ1 = new();
+    RecordModel recordModelQ2 = new();
+    RecordModel recordModelQ3 = new();
+    RecordModel recordModelQ4 = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        RetrieveFromCache<User>("User", userData => UserData = userData);
+        RetrieveFromCache<Class>("Class", classData => ClassData = classData);
+
+        var result = await StudentService.GetAllStudentsAsync(ClassData.ClassID);
+        studentlist = result.Data != null ? result.Data.ToList() : null;
+        // var student = await ClassRecordService.GetStudentGradeComponents(ClassData.ClassID, studentlist.FirstOrDefault().StudentId);
+        // recordModelQ1 = student.Student != null ? await LoadLookup(student, 1) : null;
+        // recordModelQ2 = student.Student != null ? await LoadLookup(student, 2) : null;
+        // recordModelQ3 = student.Student != null ? await LoadLookup(student, 3) : null;
+        // recordModelQ4 = student.Student != null ? await LoadLookup(student, 4) : null;
+    }
+    void RetrieveFromCache<T>(string key, Action<T> onSuccess)
+    {
+        if (CacheService.TryGetValue<T>(key, out var data))
+        {
+            onSuccess(data);
+        }
+    }
+
+    async Task LoadGradeComponents(ChangeEventArgs e)
+    {
+        recordModel.Student = null;
+        int type = int.Parse(e.Value.ToString());
+        var result = await ClassRecordService.GetStudentGradeComponents(ClassData.ClassID, type);
+        if(result.Student != null)
+        {
+            await LoadAll(result);
+        }
+
+    }
+
+    async Task LoadAll(RecordModel student)
+    {
+        recordModelQ1 = student.Student != null ? await LoadLookup(student, 1) : null;
+        recordModelQ2 = student.Student != null ? await LoadLookup(student, 2) : null;
+        recordModelQ3 = student.Student != null ? await LoadLookup(student, 3) : null;
+        recordModelQ4 = student.Student != null ? await LoadLookup(student, 4) : null;
+    }
+
+    async Task<LookUpSessions> GetSessions(int classid, int studentid, int quarterid)
+    {
+        var sessions = await AttendanceService.GetAttendanceSessionsAsync(classid, studentid, quarterid);
+        return sessions.Data;
+    }
+
+    async Task<RecordModel> LoadLookup(RecordModel record, int quarterid)
+    {
+        foreach (var item in record.Student)
+        {
+
+            int qrtrGrade = 0;
+            foreach (var data in item.Quarters)
+            {
+                if(data.Value.QuarterID == quarterid)
+                {
+                    item.TotalWrittenScore = 0;
+                    item.AverageWrittenScore = 0;
+
+                    item.TotalPerformanceScore = 0;
+                    item.AveragePerformanceScore = 0;
+
+                    item.TotalPeridiocialScore = 0;
+                    item.AveragePeriodicalScore = 0;
+
+                    if (data.Value.WrittenOutput != null && data.Value.WrittenOutput.Count != 0)
+                    {
+                        int totalWRT = 0;
+                        double wScore = 0.0;
+                        foreach (var keys in data.Value.WrittenOutput)
+                        {
+                            item.TotalWrittenScore += keys.Value.WrittenData.Score;
+                            totalWRT += keys.Value.MaxScore;
+                            wScore = keys.Value.WeightedScore;
+                        }
+                        item.AverageWrittenScore = (((double)item.TotalWrittenScore / totalWRT) * 100 * wScore);
+
+                    }
+                    if (data.Value.PerformanceOutput != null && data.Value.PerformanceOutput.Count != 0)
+                    {
+                        int totalPRF = 0;
+                        double wScore = 0.0;
+                        foreach (var keys in data.Value.PerformanceOutput)
+                        {
+                            item.TotalPerformanceScore += keys.Value.PerformanceData.Score;
+                            totalPRF += keys.Value.MaxScore;
+                            wScore = keys.Value.WeightedScore;
+                        }
+                        item.AveragePerformanceScore = (((double)item.TotalPerformanceScore / totalPRF) * 100 * wScore);
+                    }
+                    if (data.Value.PeriodicalOutput != null && data.Value.PeriodicalOutput.Count != 0)
+                    {
+
+                        int totalPRD = 0;
+                        double wScore = 0.0;
+                        foreach (var keys in data.Value.PeriodicalOutput)
+                        {
+                            item.TotalPeridiocialScore += keys.Value.PeriodicalData.Score;
+                            totalPRD += keys.Value.MaxScore;
+                            wScore = keys.Value.WeightedScore;
+                        }
+
+                        item.AveragePeriodicalScore = (((double)item.TotalPeridiocialScore / totalPRD) * 100 * wScore);
+                    }
+
+
+                    item.InitialGrade = item.AverageWrittenScore + item.AveragePerformanceScore + item.AveragePeriodicalScore;
+                    var grade = await ClassRecordService.GetGradeRulesAsync(item.InitialGrade);
+                    data.Value.Grade = grade.Data != 0 ? grade.Data : 0;
+                    qrtrGrade += data.Value.Grade;
+
+                    var sessions = await GetSessions(ClassData.ClassID, item.StudentId, quarterid);
+                    data.Value.Sessions = sessions.AttendanceSessions;
+                    data.Value.SessionsPresent = sessions.AttendancePresent;
+                }
+            }
+            item.FinalGrade = qrtrGrade / 4;
+            item.GradeRemarks = item.FinalGrade <= 74 ? "FAILED" : "PASSED";
+
+            
+
+        }
+        return record;
+    }
+
+}

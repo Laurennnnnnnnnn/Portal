@@ -1,0 +1,1161 @@
+﻿@page "/settings"
+@using DomainLayer.Entities
+
+@using Microsoft.Extensions.Caching.Memory
+@using NetcodeHub.Packages.Components.Validations.OnInput
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ApplicationLayer.Services
+@using Blazored.Toast.Services
+@inject IToastService toastService
+@inject ICacheService CacheService
+@inject IUserService UserService
+@inject IClassService ClassService
+@inject IResourcesService ResourcesService
+
+<div class="h-100 overflow-auto">
+    <div class="row h-50 gap-0">
+        <div class="col h-100 p-2">
+            <div class="m-1 h-100 mh-100 shadow p-2">
+                <label class="fw-bold">Class Table</label>
+                <div class="mb-2 text-end">
+                    <div class="row">
+                        <div class="col m-auto w-auto">
+                                @if (schoolYearlist != null)
+                                {
+                                    <select class="form-control w-auto" id="schyear" @onchange="(e) => LoadClass2(e)">
+                                        <option selected hidden>Please select SchoolYear</option>
+                                        @foreach (var item in schoolYearlist)
+                                        {
+                                            <option value="@item.SchoolYearID">@item.SchoolYearName</option>
+                                        }
+                                    </select>
+                                    
+                                }
+                        </div>
+                        <div class="col m-auto">
+                            <button type="button" class="btn btn-primary" data-bs-target="#classadd" data-bs-toggle="modal" @onclick="() => newClass = new Class()">Add Class</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-auto h-75">
+                <QuickGrid Class="table table-hover table-responsive mt-0" Items="@classlist" Theme="corporate">
+                    <PropertyColumn Property="c => (c.ClassName)" Title="Name" Class="align-items-center" Sortable="true" />
+                    <PropertyColumn Property="c => (c.SubjectName)" Title="Subject" Class="align-items-center" Sortable="true"/>
+                    <TemplateColumn Context="c" Title="Actions" Class="justify-content-evenly border-0">
+                            <button class="btn text-success" data-bs-target="#classupdate" data-bs-toggle="modal" @onclick="() => SetSelectedClass(c)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16">
+                                <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z" />
+                            </svg>
+                        </button>
+                            <button class="btn text-danger" data-bs-target="#confirmationmodal" data-bs-toggle="modal" @onclick='(e) => DeleteSet("class", c.ClassID)'>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-archive-fill" viewBox="0 0 16 16">
+                                <path d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15zM5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1M.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8z" />
+                            </svg>
+                        </button>
+                    </TemplateColumn>
+                </QuickGrid>
+                </div>
+            </div>
+        </div>
+        <div class="col h-100 p-2">
+            <div class="m-1 h-100 mh-100 shadow p-2">
+                <label class="fw-bold">Quarter Dates Table</label>
+                <div class="mb-2 text-end">
+                    <div class="row">
+                        <div class="col m-auto w-auto">
+                            @if (schoolYearlist != null)
+                            {
+                                <select class="form-control w-auto" id="schyear" @onchange="(e) => LoadQuarterDate(e)">
+                                    <option selected hidden>Please select SchoolYear</option>
+                                    @foreach (var item in schoolYearlist)
+                                    {
+                                        <option value="@item.SchoolYearID">@item.SchoolYearName</option>
+                                    }
+                                </select>
+
+                            }
+                        </div>
+                        <div class="col m-auto">
+                            <button type="button" class="btn btn-primary" data-bs-target="#quartersadd" data-bs-toggle="modal" @onclick="() => newquarterDates = new QuartersDate()">Add Quarter Dates</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-auto h-75">
+                    <QuickGrid Class="table table-hover table-responsive mt-0" Items="@datesQlist" Theme="corporate">
+                        <PropertyColumn Property="c => (c.DateFrom)" Title="From" Class="align-items-center" Sortable="true" />
+                        <PropertyColumn Property="c => (c.DateTo)" Title="To" Class="align-items-center" Sortable="true" />
+                        <PropertyColumn Property="c => (c.SchoolYearName)" Title="SchoolYear Name" Class="align-items-center" Sortable="true" />
+                        <PropertyColumn Property="c => (c.QuarterName)" Title="Quarter Name" Class="align-items-center" Sortable="true" />
+                        <TemplateColumn Context="c" Title="Actions" Class="justify-content-evenly border-0">
+                            <button class="btn text-success" data-bs-target="#quartersupdate" data-bs-toggle="modal" @onclick="() => SetQuartersDate(c)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16">
+                                    <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z" />
+                                </svg>
+                            </button>
+                            <button class="btn text-danger" data-bs-target="#confirmationmodal" data-bs-toggle="modal" @onclick='(e) => DeleteSet("quarters", c.QuartersDateID)'>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-archive-fill" viewBox="0 0 16 16">
+                                    <path d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15zM5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1M.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8z" />
+                                </svg>
+                            </button>
+                        </TemplateColumn>
+                    </QuickGrid>
+                </div>
+            </div>
+        </div>
+       
+    </div>
+    <div class="row h-50 gap-0">
+        <div class="col h-100 p-2">
+
+            <div class="m-1 h-100 mh-100 shadow p-2">
+                <label class="fw-bold">Section Table</label>
+                <div class="mb-2 text-end">
+                    <div class="row">
+                        <div class="col m-auto">
+                            <button type="button" class="btn btn-primary" data-bs-target="#sectionadd" data-bs-toggle="modal" @onclick="() => SectName = string.Empty">Add Section</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-auto h-75">
+                <QuickGrid Class="table table-hover table-responsive mt-0" Items="@sectionlist" Theme="corporate">
+                    <PropertyColumn Property="c => (c.SectionName)" Title="Name" Class="align-items-center" Sortable="true" />
+                    <TemplateColumn Context="c" Title="Actions" Class="justify-content-evenly border-0">
+                            <button class="btn text-success" data-bs-target="#sectionupdate" data-bs-toggle="modal" @onclick="() => SetSelectedSection(c)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16">
+                                <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z" />
+                            </svg>
+                        </button>
+                            <button class="btn text-danger" data-bs-target="#confirmationmodal" data-bs-toggle="modal" @onclick='(e) => DeleteSet("section", c.SectionID)'>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-archive-fill" viewBox="0 0 16 16">
+                                <path d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15zM5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1M.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8z" />
+                            </svg>
+                        </button>
+                    </TemplateColumn>
+                </QuickGrid>
+                </div>
+            </div>
+        </div>
+        <div class="col h-100 p-2">
+
+            <div class="m-1 h-100 mh-100 shadow p-2">
+                <label class="fw-bold">School Year Table</label>
+                <div class="mb-2 text-end">
+                    <div class="row">
+                        <div class="col m-auto">
+                            <button type="button" class="btn btn-primary" data-bs-target="#schyearadd" data-bs-toggle="modal" @onclick="() => SchYearName = string.Empty">Add School Year</button>
+                        </div>
+                    </div>
+                </div>
+                 <div class="overflow-auto h-75">
+                <QuickGrid Class="table table-hover table-responsive mt-0" Items="@schoolYearlist" Theme="corporate">
+                    <PropertyColumn Property="c => (c.SchoolYearName)" Title="Name" Class="align-items-center" Sortable="true" />
+                    <TemplateColumn Context="c" Title="Actions" Class="justify-content-evenly border-0">
+                            <button class="btn text-success" data-bs-target="#schyearupdate" data-bs-toggle="modal" @onclick="() => SetSelectedSchoolYear(c)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16">
+                                <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z" />
+                            </svg>
+                        </button>
+                            <button class="btn text-danger" data-bs-target="#confirmationmodal" data-bs-toggle="modal" @onclick='(e) => DeleteSet("schoolyear", c.SchoolYearID)'>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-archive-fill" viewBox="0 0 16 16">
+                                <path d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15zM5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1M.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8z" />
+                            </svg>
+                        </button>
+                    </TemplateColumn>
+                </QuickGrid>
+                </div>
+            </div>
+        </div>
+        <div class="col h-100 p-2">
+            <div class="m-1 h-100 mh-100 shadow p-2">
+                <label class="fw-bold">Subject Table</label>
+                <div class="mb-2 text-end">
+                    <div class="row">
+                        <div class="col m-auto">
+                            <button type="button" class="btn btn-primary" data-bs-target="#subjectadd" data-bs-toggle="modal" @onclick="() => SubName = string.Empty">Add Subject</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-auto h-75">
+                    <QuickGrid Class="table table-hover table-responsive mt-0" Items="@subjectlist" Theme="corporate">
+                        <PropertyColumn Property="c => (c.SubjectName)" Title="Name" Class="align-items-center" Sortable="true" />
+                        <TemplateColumn Context="c" Title="Actions" Class="justify-content-evenly border-0">
+                            <button class="btn text-success" data-bs-target="#subjectupdate" data-bs-toggle="modal" @onclick="() => SetSelectedSubject(c)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16">
+                                    <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z" />
+                                </svg>
+                            </button>
+                            <button class="btn text-danger" data-bs-target="#confirmationmodal" data-bs-toggle="modal" @onclick='(e) => DeleteSet("subject", c.SubjectID)'>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-archive-fill" viewBox="0 0 16 16">
+                                    <path d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15zM5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1M.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8z" />
+                                </svg>
+                            </button>
+                        </TemplateColumn>
+                    </QuickGrid>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="classadd" aria-hidden="true" aria-labelledby="classaddLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="classaddLabel2">Add Class</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="w-100 m-auto d-flex flex-row">
+                    <EditForm Model="newClass" class="w-100">
+                        <DataAnnotationsValidator />
+                        <div class="row justify-content-evenly">
+                            <div class="col my-2">
+                                <form class="form-floating m-2">
+                                    @if(schoolYearlist != null)
+                                    {
+                                        <select class="form-control" id="schyear" @bind="newClass.SchoolYearID">
+                                            <option selected hidden>Please select SchoolYear</option>
+                                            @foreach (var item in schoolYearlist)
+                                            {
+                                                <option value="@item.SchoolYearID">@item.SchoolYearName</option>
+                                            }
+                                        </select>
+                                        <label for="schyear">School Year</label>
+                                     }
+                                </form>
+                                <form class="form-floating m-2">
+                                    @if (gradelist != null)
+                                    {
+                                        <select class="form-control" id="grd" @bind="newClass.GradeID">
+                                        <option selected hidden>Please select Level</option>
+                                            @foreach (var item in gradelist)
+                                        {
+                                            <option value="@item.GradeID">@item.GradeName</option>
+                                        }
+                                    </select>
+                                    <label for="grd">Grade</label>
+                                    }
+                                </form>
+                                <form class="form-floating m-2">
+                                    @if (sectionlist != null)
+                                    {
+                                        <select class="form-control" id="section" @bind="newClass.SectionID">
+                                            <option selected hidden>Please select Section</option>
+                                            @foreach (var item in sectionlist)
+                                            {
+                                                <option value="@item.SectionID">@item.SectionName</option>
+                                            }
+                                        </select>
+                                        <label for="section">Section</label>
+                                    }
+                                </form>
+                                <form class="form-floating m-2">
+                                   @if (subjectlist != null)
+                                    {
+                                        <select class="form-control" id="subject" @bind="newClass.SubjectID">
+                                            <option selected hidden>Please select Subject</option>
+                                            @foreach (var item in subjectlist)
+                                            {
+                                                <option value="@item.SubjectID">@item.SubjectName</option>
+                                            }
+                                        </select>
+                                        <label for="subject">Subject</label>
+                                    }
+                                </form> 
+                            </div>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" disabled="@IsNewClassDisable()" data-bs-dismiss="modal" @onclick="() => AddClass(newClass)">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="classupdate" aria-hidden="true" aria-labelledby="classupdateLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="classupdateLabel2">Update Class</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="w-100 m-auto d-flex flex-row">
+                    <EditForm Model="newClass" class="w-100">
+                        <DataAnnotationsValidator />
+                        <div class="row justify-content-evenly">
+                            <div class="col my-2">
+                                <form class="form-floating m-2">
+                                    @if (schoolYearlist != null)
+                                    {
+                                        <select class="form-control" id="schyear" @bind="newClass.SchoolYearID">
+                                            <option selected hidden>Please select Quarter</option>
+                                            @foreach (var item in schoolYearlist)
+                                            {
+                                                <option value="@item.SchoolYearID">@item.SchoolYearName</option>
+                                            }
+                                        </select>
+                                        <label for="schyear">School Year</label>
+                                    }
+                                </form>
+                                <form class="form-floating m-2">
+                                    @if (gradelist != null)
+                                    {
+                                        <select class="form-control" id="grd" @bind="newClass.GradeID">
+                                            <option selected>Please select Level</option>
+                                            @foreach (var item in gradelist)
+                                            {
+                                                <option value="@item.GradeID">@item.GradeName</option>
+                                            }
+                                        </select>
+                                        <label for="grd">Grade</label>
+                                    }
+                                </form>
+                                <form class="form-floating m-2">
+                                    @if (sectionlist != null)
+                                    {
+                                        <select class="form-control" id="section" @bind="newClass.SectionID">
+                                            <option selected hidden>Please select Section</option>
+                                            @foreach (var item in sectionlist)
+                                            {
+                                                <option value="@item.SectionID">@item.SectionName</option>
+                                            }
+                                        </select>
+                                        <label for="section">Section</label>
+                                    }
+                                </form>
+                                <form class="form-floating m-2">
+                                    @if (subjectlist != null)
+                                    {
+                                        <select class="form-control" id="subject" @bind="newClass.SubjectID">
+                                            <option selected>Please select Subject</option>
+                                            @foreach (var item in subjectlist)
+                                            {
+                                                <option value="@item.SubjectID">@item.SubjectName</option>
+                                            }
+                                        </select>
+                                        <label for="subject">Subject</label>
+                                    }
+                                </form>
+                            </div>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" @onclick="() => UpdateClass(newClass)">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="subjectadd" aria-hidden="true" aria-labelledby="subjectaddLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="subjectaddLabel2">Add Subject</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="w-100 m-auto">
+                    <form class="form-floating">
+                        <input type="text" class="form-control" id="subj" @bind="SubName" placeholder="Subject Name" onkeypress="if(event.charCode != 8 && event.charCode != 0 &&
+                               !((event.charCode>= 48 && event.charCode <= 57) ||
+                        (event.charCode >= 65 && event.charCode <= 90) ||
+                        (event.charCode >= 97 && event.charCode <= 122))) {
+                        event.preventDefault();
+                        }" oninput="this.value = this.value.toUpperCase();">
+                        <label for="subj">Subject Name</label>
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" disabled="@IsNewSubjectDisable()" data-bs-dismiss="modal" @onclick="() => AddSubject(SubName)">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="subjectupdate" aria-hidden="true" aria-labelledby="subjectupdateLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="subjectupdateLabel2">Update Subject</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <EditForm Model="newSubject" class="w-100">
+                    <DataAnnotationsValidator />
+                    <div class="row justify-content-evenly">
+                        <div class="col my-2">
+                            <form class="form-floating">
+                                <input type="text" class="form-control" id="subj" @bind="newSubject.SubjectName" placeholder="Subject Name" onkeypress="if(event.charCode != 8 && event.charCode != 0 &&
+                                       !((event.charCode>= 48 && event.charCode <= 57) ||
+                                (event.charCode >= 65 && event.charCode <= 90) ||
+                                (event.charCode >= 97 && event.charCode <= 122))) {
+                                event.preventDefault();
+                                }" oninput="this.value = this.value.toUpperCase();">
+                                <label for="subj">Subject Name</label>
+                            </form>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" @onclick="() => UpdateSubject(newSubject)">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="schyearadd" aria-hidden="true" aria-labelledby="schyearaddLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="schyearaddLabel2">Add School Year</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="w-100 m-auto row">
+                    <div class="col my-2">
+                        <form class="form-floating m-2">
+                            @if (DateFrom != null)
+                            {
+                                <select class="form-control" id="fr" @onchange="(e) => DateToReload(e)">
+                                    <option selected hidden>Please select Year</option>
+                                    @foreach (var item in DateFrom)
+                                    {
+                                        <option value="@item">@item</option>
+                                    }
+                                </select>
+                                <label for="fr">From</label>
+                            }
+                        </form>
+                    </div>
+                    <div class="col my-2">
+                        <form class="form-floating m-2">
+                            @if (DateTo != null)
+                            {
+                                <select class="form-control" id="to" @bind="SchYearTo">
+                                    <option selected hidden>Please select Year</option>
+                                    @foreach (var item in DateTo)
+                                    {
+                                        <option value="@item">@item</option>
+                                    }
+                                </select>
+                                <label for="to">To</label>
+                            }
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" disabled="@IsNewSchoolYearDisable()" data-bs-dismiss="modal" @onclick="() => AddSchoolYear()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="schyearupdate" aria-hidden="true" aria-labelledby="schyearupdateLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="schyearupdateLabel2">Update School Year</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <EditForm Model="newSchoolYear" class="w-100">
+                    <DataAnnotationsValidator />
+                    <div class="row justify-content-evenly">
+                        <div class="col my-2">
+                            <form class="form-floating">
+                                <input type="text" class="form-control" id="subj" @bind="newSchoolYear.SchoolYearName" placeholder="School Year">
+                                <label for="subj">School Year</label>
+                            </form>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" @onclick="() => UpdateSchoolYear(newSchoolYear)">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="sectionadd" aria-hidden="true" aria-labelledby="sectionaddLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="sectionaddLabel2">Add Section</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="w-100 m-auto">
+                    <form class="form-floating">
+                        <input type="text" class="form-control" id="sect" @bind="SectName" placeholder="Section" onkeypress="if(event.charCode != 8 && event.charCode != 0 &&
+                               !((event.charCode>= 48 && event.charCode <= 57) ||
+                        (event.charCode >= 65 && event.charCode <= 90) ||
+                        (event.charCode >= 97 && event.charCode <= 122))) {
+                        event.preventDefault();
+                        }" oninput="this.value = this.value.toUpperCase();">
+                        <label for="sect">Section Name</label>
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" disabled="@IsNewSectionDisable()" data-bs-dismiss="modal" @onclick="() => AddSection(SectName)">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="sectionupdate" aria-hidden="true" aria-labelledby="sectionupdateLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="sectionupdateLabel2">Update Section</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <EditForm Model="newSection" class="w-100">
+                    <DataAnnotationsValidator />
+                    <div class="row justify-content-evenly">
+                        <div class="col my-2">
+                            <form class="form-floating">
+                                <input type="text" class="form-control" id="subj" @bind="newSection.SectionName" placeholder="Section Name" onkeypress="if(event.charCode != 8 && event.charCode != 0 &&
+                                       !((event.charCode>= 48 && event.charCode <= 57) ||
+                                (event.charCode >= 65 && event.charCode <= 90) ||
+                                (event.charCode >= 97 && event.charCode <= 122))) {
+                                event.preventDefault();
+                                }" oninput="this.value = this.value.toUpperCase();">
+                                <label for="subj">Section Name</label>
+                            </form>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" @onclick="() => UpdateSection(newSection)">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="quartersadd" aria-hidden="true" aria-labelledby="quartersaddLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="quartersaddLabel2">Add Quarters</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <EditForm Model="newquarterDates" class="w-100">
+                        <DataAnnotationsValidator />
+                <div class="row">
+                    <div class="col m-auto">
+                        <label class="form-label">From</label>
+                            <input type="date" class="form-control" @bind="dateFrom" />
+                    </div>
+                    <div class="col m-auto">
+                        <label class="form-label">To</label>
+                            <input type="date" class="form-control" @bind="dateTo" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col m-auto">
+                        <form class="form-floating m-2">
+                            @if (schoolYearlist != null)
+                            {
+                                    <select class="form-control" id="schyear" @bind="newquarterDates.SchoolYearID">
+                                        <option selected hidden>Please select SchoolYear</option>
+                                    @foreach (var item in schoolYearlist)
+                                    {
+                                        <option value="@item.SchoolYearID">@item.SchoolYearName</option>
+                                    }
+                                </select>
+                                <label for="schyear">School Year</label>
+                            }
+                        </form>
+                    </div>
+                    <div class="col m-auto">
+                        <form class="form-floating m-2">
+                                @if (quarterlist != null)
+                            {
+                                    <select class="form-control" id="quartersd" @bind="newquarterDates.QuarterID">
+                                <option selected>Please select Quarter</option>
+                                @foreach (var item in quarterlist)
+                                {
+                                    <option value="@item.QuarterID">@item.QuarterName</option>
+                                }
+                            </select>
+                                    <label for="quartersd">Quarter</label>
+                            }
+                        </form>
+                    </div>
+                </div>
+                </EditForm>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" disabled="@IsNewQuarterDatesDisable()" data-bs-dismiss="modal" @onclick="() => AddQuartersDate(newquarterDates)">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="quartersupdate" aria-hidden="true" aria-labelledby="quartersupdateLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="quartersupdateLabel2">Update Quarters Date</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <EditForm Model="newquarterDates" class="w-100">
+                    <DataAnnotationsValidator />
+                    <div class="row justify-content-evenly">
+                        <div class="col my-2">
+                            <form class="form-floating">
+                                <input type="date" class="form-control" id="dTo" @bind="newquarterDates.From" placeholder="Date From">
+                                <label for="dTo">Date From</label>
+                            </form>
+                        </div>
+                        <div class="col my-2">
+                            <form class="form-floating">
+                                <input type="date" class="form-control" id="dFr" @bind="newquarterDates.To" placeholder="Date To">
+                                <label for="dFr">Date To</label>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col m-auto">
+                            <form class="form-floating m-2">
+                                @if (schoolYearlist != null)
+                                {
+                                    <select class="form-control" id="schyear" @bind="newquarterDates.SchoolYearID">
+                                        <option selected hidden>Please select SchoolYear</option>
+                                        @foreach (var item in schoolYearlist)
+                                        {
+                                            <option value="@item.SchoolYearID">@item.SchoolYearName</option>
+                                        }
+                                    </select>
+                                    <label for="schyear">School Year</label>
+                                }
+                            </form>
+                        </div>
+                        <div class="col m-auto">
+                            <form class="form-floating m-2">
+                                @if (quarterlist != null)
+                                {
+                                    <select class="form-control" id="quartersd" @bind="newquarterDates.QuarterID">
+                                        <option selected>Please select Quarter</option>
+                                        @foreach (var item in quarterlist)
+                                        {
+                                            <option value="@item.QuarterID">@item.QuarterName</option>
+                                        }
+                                    </select>
+                                    <label for="quartersd">School Year</label>
+                                }
+                            </form>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" @onclick="() => UpdateQuartersDate(newquarterDates)">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" tabindex="-1" id="confirmationmodal" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Record Confirmation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" @onclick="() => DeleteReset()"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the record?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" @onclick="() => DeleteReset()">Cancel</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" @onclick="() => DeleteConfirm()">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    public class ItemForDelete
+    {
+        public string type { get; set; } = string.Empty;
+        public int id { get; set; }
+    }
+    IQueryable<Class> classlist = Enumerable.Empty<Class>().AsQueryable();
+    IQueryable<Subject> subjectlist = Enumerable.Empty<Subject>().AsQueryable();
+    IQueryable<QuartersDate> datesQlist = Enumerable.Empty<QuartersDate>().AsQueryable();
+    IQueryable<Section> sectionlist = Enumerable.Empty<Section>().AsQueryable();
+    IQueryable<SchoolYear> schoolYearlist = Enumerable.Empty<SchoolYear>().AsQueryable();
+    IQueryable<GradeLevel> gradelist = Enumerable.Empty<GradeLevel>().AsQueryable();
+    IQueryable<Quarter> quarterlist = Enumerable.Empty<Quarter>().AsQueryable();
+
+    Class newClass = new();
+    Subject newSubject = new();
+    QuartersDate newquarterDates = new();
+    SchoolYear newSchoolYear = new();
+    Section newSection = new();
+
+    private List<GradeLevel> gradeLevels;
+    private List<Subject> sublist = new();
+    private ItemForDelete forDelete = new();
+
+
+    private string subName;
+    private string schYearName;
+    private string sectName;
+    private int selectedyear;
+    private int selectedschyear;
+    private int selectedschoolyear;
+
+    private DateTime dateFrom;
+    private DateTime dateTo;
+
+    private List<string> DateTo = new();
+
+    private List<string> DateFrom = new();
+    private string _schYearFrom;
+    private string _schYearTo;
+
+    public string SchYearTo
+    {
+        get { return _schYearTo; }
+        set { _schYearTo = value; }
+    }
+
+    public string SchYearFrom
+    {
+        get { return _schYearFrom; }
+        set { _schYearFrom = value; }
+    }
+
+
+    public string SectName
+    {
+        get { return sectName; }
+        set { sectName = value; }
+    }
+
+    public string SchYearName
+    {
+        get { return schYearName; }
+        set { schYearName = value; }
+    }
+
+    public string SubName
+    {
+        get { return subName; }
+        set { subName = value; }
+    }
+
+    public List<GradeLevel> GradeLevels
+    {
+        get { return gradeLevels; }
+        set { gradeLevels = value; }
+    }
+
+    private User user;
+    public User UserData
+    {
+        get { return user; }
+        set { user = value; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        RetrieveFromCache<User>("User", userData => UserData = userData);
+        var level = await ResourcesService.GetGradeAsync(UserData.CategoryID);
+        gradelist = level.Data != null ? level.Data.AsQueryable() : null;
+        var quarter = await ResourcesService.GetQuartersAsync();
+        quarterlist = quarter != null ? quarter.Data.AsQueryable() : null;
+        var classresult = await ClassService.GetClassByUserSchoolYearAsync(UserData.UserID, 0);
+        classlist = classresult.Data != null ? classresult.Data.AsQueryable() : null;
+        for (int i = 0; i < 3; i++)
+        {
+            DateFrom.Add(DateTime.Today.AddYears(i).ToString("yyyy"));
+        }
+        dateFrom = DateTime.Today;
+        dateTo = DateTime.Today;
+
+        await LoadSubject();
+        await LoadSection();
+        await LoadSchoolYear();
+
+
+
+
+    }
+
+    async Task LoadClass2(ChangeEventArgs e)
+    {
+        selectedyear = int.Parse(e.Value.ToString());
+        var classresult = await ClassService.GetClassByUserSchoolYearAsync(UserData.UserID, selectedyear);
+        classlist = classresult.Data != null ? classresult.Data.AsQueryable() : null;
+    }
+    async Task LoadClass(int schoolyearid)
+    {
+        selectedyear = schoolyearid;
+        var classresult = await ClassService.GetClassByUserSchoolYearAsync(UserData.UserID, selectedyear);
+        classlist = classresult.Data != null ? classresult.Data.AsQueryable() : null;
+    }
+    async Task LoadSubject()
+    {
+        var subjectresult = await ResourcesService.GetSubjectAsync();
+        subjectlist = subjectresult.Data != null ? subjectresult.Data.AsQueryable() : null;
+
+    }
+    async Task LoadSection(){
+        var sectionresult = await ResourcesService.GetSectionAsync();
+        sectionlist = sectionresult.Data != null ? sectionresult.Data.AsQueryable() : null;
+    }
+    async Task LoadSchoolYear(){
+        var schoolyearresult = await ResourcesService.GetSchoolYearAsync();
+        schoolYearlist = schoolyearresult.Data != null ? schoolyearresult.Data.AsQueryable() : null;
+    }
+    async Task LoadQuarterDate(ChangeEventArgs e)
+    {
+        selectedschyear = int.Parse(e.Value.ToString());
+        var quartersdateresult = await ResourcesService.GetQuartersDateAsync(selectedschyear);
+        datesQlist = quartersdateresult.Data != null ? quartersdateresult.Data.AsQueryable() : null;
+    }
+    async Task LoadQuarterDateRefresh()
+    {
+        var quartersdateresult = await ResourcesService.GetQuartersDateAsync(selectedschyear);
+        datesQlist = quartersdateresult.Data != null ? quartersdateresult.Data.AsQueryable() : null;
+    }
+
+    void RetrieveFromCache<T>(string key, Action<T> onSuccess)
+    {
+        if (CacheService.TryGetValue<T>(key, out var data))
+        {
+            onSuccess(data);
+        }
+    }
+
+    async Task AddClass(Class classdata)
+    {
+        classdata.ClassName = $"Grade {gradelist.FirstOrDefault(g => g.GradeID == classdata.GradeID).GradeName} - {sectionlist.FirstOrDefault(s => s.SectionID == classdata.SectionID).SectionName}";
+        var result = await ClassService.AddClassAsync(classdata, UserData.UserID);
+        if (result.IsSuccess)
+        {
+            toastService.ShowSuccess("Add Successfully");
+        }
+        else
+        {
+            toastService.ShowError(result.ErrorMessage.ToString());
+        }
+        await LoadClass(0);
+    }
+    async Task AddSubject(string subjectname)
+    {
+        var result = await ResourcesService.AddSubjectAsync(subjectname);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message.ToString());
+        }
+        else
+        {
+            toastService.ShowError(result.Message.ToString());
+        }
+        await LoadSubject();
+    }
+    async Task AddSection(string sectionname)
+    {
+        var result = await ResourcesService.AddSectionAsync(sectionname);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message.ToString());
+        }
+        else
+        {
+            toastService.ShowError(result.Message.ToString());
+        }
+        await LoadSection();
+    }
+    async Task AddSchoolYear()
+    {
+        var result = await ResourcesService.AddSchoolYearAsync(SchYearFrom + " - " + SchYearTo);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message.ToString());
+        }
+        else
+        {
+            toastService.ShowError(result.Message.ToString());
+        }
+        await LoadSchoolYear();
+    }
+    async Task AddQuartersDate(QuartersDate date)
+    {
+        date.DateFrom = dateFrom.ToString("MM/dd/yyyy");
+        date.DateTo = dateTo.ToString("MM/dd/yyyy");
+        var result = await ResourcesService.AddQuartersDateAsync(date);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message.ToString());
+        }
+        else
+        {
+            toastService.ShowError(result.Message.ToString());
+        }
+        await LoadQuarterDateRefresh();
+    }
+    async Task SetSelectedClass(Class data)
+    {
+        newClass = data;
+    }
+    async Task SetSelectedSubject(Subject data)
+    {
+        newSubject = data;
+    }
+    async Task SetSelectedSection(Section data)
+    {
+        newSection = data;
+    }
+    async Task SetSelectedSchoolYear(SchoolYear data)
+    {
+        newSchoolYear = data;
+    }
+    async Task SetQuartersDate(QuartersDate data)
+    {
+        data.From = DateTime.Parse(data.DateFrom);
+        data.To = DateTime.Parse(data.DateTo);
+        newquarterDates = data;
+    }
+
+    async Task UpdateClass(Class classdata)
+    {
+        classdata.ClassName = $"Grade {gradelist.FirstOrDefault(g => g.GradeID == classdata.GradeID).GradeName} - {sectionlist.FirstOrDefault(s => s.SectionID == classdata.SectionID).SectionName}";
+        var result = await ClassService.UpdateClassAsync(classdata, UserData.UserID);
+        if (result.IsSuccess)
+        {
+            toastService.ShowSuccess("Update Successfully");
+        }
+        else
+        {
+            toastService.ShowError(result.ErrorMessage.ToString());
+        }
+        await LoadClass(0);
+    }
+
+    async Task UpdateSubject(Subject data)
+    {
+        var result = await ResourcesService.UpdateSubjectAsync(data);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await LoadSubject();
+    }
+    async Task UpdateSection(Section data)
+    {
+        var result = await ResourcesService.UpdateSectionAsync(data);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await LoadSection();
+    }
+    async Task UpdateSchoolYear(SchoolYear data)
+    {
+        var result = await ResourcesService.UpdateSchoolYearAsync(data);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await LoadSchoolYear();
+    }
+
+
+
+    async Task UpdateQuartersDate(QuartersDate data)
+    {
+        data.DateFrom = data.From.ToString("MM/dd/yyyy");
+        data.DateTo = data.To.ToString("MM/dd/yyyy");
+        var result = await ResourcesService.UpdateQuartersDateAsync(data);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await LoadQuarterDateRefresh();
+    }
+
+    async Task DeleteClass(int ClassID)
+    {
+        var result = await ClassService.DeleteClassAsync(ClassID, UserData.UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await LoadClass(0);
+    }
+
+    async Task DeleteSubject(int SubjectID)
+    {
+        var result = await ResourcesService.DeleteSubjectAsync(SubjectID, UserData.UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await LoadSubject();
+    }
+    async Task DeleteSection(int SectionID)
+    {
+        var result = await ResourcesService.DeleteSectionAsync(SectionID, UserData.UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await LoadSection();
+    }
+    async Task DeleteSchoolYear(int SchoolYearID)
+    {
+        var result = await ResourcesService.DeleteSchoolYearAsync(SchoolYearID, UserData.UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await LoadSchoolYear();
+    }
+    async Task DeleteQuartersDate(int QuartersDateID)
+    {
+        var result = await ResourcesService.DeleteQuartersDateAsync(QuartersDateID, UserData.UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await LoadQuarterDateRefresh();
+    }
+
+    private bool IsNewClassDisable()
+    {
+        var requiredFields = new[] { "GradeID", "SectionID", "SubjectID", "SchoolYearID" };
+        return requiredFields.Any(field =>
+        string.IsNullOrWhiteSpace(newClass.GetType().GetProperty(field)?.GetValue(newClass)?.ToString()) ||
+        (field == "GradeID" && newClass.GradeID == 0) ||
+        (field == "SectionID" && newClass.SectionID == 0) ||
+        (field == "SubjectID" && newClass.SubjectID == 0) ||
+        (field == "SchoolYearID" && newClass.SchoolYearID == 0));
+    }
+    private bool IsNewQuarterDatesDisable()
+    {
+        var requiredFields = new[] { "SchoolYearID", "QuarterID" };
+        return requiredFields.Any(field =>
+        string.IsNullOrWhiteSpace(newquarterDates.GetType().GetProperty(field)?.GetValue(newquarterDates)?.ToString()) ||
+        (field == "SchoolYearID" && newquarterDates.SchoolYearID == 0) ||
+        (field == "QuarterID" && newquarterDates.QuarterID == 0));
+    }
+
+    private bool IsNewSectionDisable()
+    {
+        bool disable = true;
+        if (!string.IsNullOrWhiteSpace(SectName)) { disable = false;}
+        return disable;
+    }
+
+    private bool IsNewSchoolYearDisable()
+    {
+        bool disable = true;
+        if (!string.IsNullOrWhiteSpace(SchYearFrom) && !string.IsNullOrWhiteSpace(SchYearTo)) { disable = false; }
+        return disable;
+    }
+
+    private bool IsNewSubjectDisable()
+    {
+        bool disable = true;
+        if (!string.IsNullOrWhiteSpace(SubName)) { disable = false; }
+        return disable;
+    }
+    void DeleteReset(){
+
+        forDelete = new ItemForDelete();
+    }
+    void DeleteSet(string type, int id)
+    {
+        forDelete = new ItemForDelete
+        {
+            type = type,
+            id = id
+        };
+    }
+    async Task DeleteConfirm(){
+
+        switch (forDelete.type)
+        {
+            case "class":
+                await DeleteClass(forDelete.id);
+                break;
+            case "quarters":
+                await DeleteQuartersDate(forDelete.id);
+                break;
+            case "section":
+                await DeleteSection(forDelete.id);
+                break;
+            case "schoolyear":
+                await DeleteSchoolYear(forDelete.id);
+                break;
+            case "subject":
+                await DeleteSubject(forDelete.id);
+                break;
+
+        }
+    }
+    void DateToReload(ChangeEventArgs e){
+        var data = e.Value.ToString();
+        SchYearFrom  = data;
+        DateTime startYear = DateTime.ParseExact(SchYearFrom, "yyyy", null);
+        for (int i = 0; i < 3; i++)
+        {
+            DateTo.Add(startYear.AddYears(i).ToString("yyyy"));
+        }
+    }
+}

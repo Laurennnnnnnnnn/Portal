@@ -1,0 +1,2416 @@
+﻿@page "/classrecord"
+
+@using ApplicationLayer.Services
+@using Blazored.Toast.Services
+@using DomainLayer.Entities
+@using DomainLayer.Models
+@using Microsoft.Extensions.Caching.Memory
+@using NetcodeHub.Packages.Components.Validations.OnInput
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using ChartJs.Blazor.BarChart
+
+@inject IToastService toastService
+@inject IClassRecordService classrec
+@inject ICacheService CacheService
+@inject IResourcesService ResourcesService
+
+
+
+<div class="h-100">
+    <div class="row" style="height: 8%;">
+        <div class="row h-auto">
+            <div class="col d-flex justify-content-center align-items-center gap-3">
+                <div class="w-50">
+                    <select class="form-control" @onchange="(e) => LoadRecordbyQuarterID(e)">
+                        @foreach (var item in quarterlist)
+                        {
+                            <option value="@item.QuarterID">@item.QuarterName</option>
+                        }
+                    </select>
+                </div>
+                <div class="w-50">
+                   <button type="button" class="btn btn-primary text-nowrap" data-bs-target="#distribution" data-bs-toggle="modal">Grade Distribution</button>
+                </div>
+            </div>
+            <div class="col d-flex justify-content-center align-items-center">
+                <div class="@displaySingle">
+                    <button class="btn btn-primary" @onclick="() => PreviousRecord()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-caret-left-fill" viewBox="0 0 16 16">
+                            <path d="m3.86 8.753 5.482 4.796c.646.566 1.658.106 1.658-.753V3.204a1 1 0 0 0-1.659-.753l-5.48 4.796a1 1 0 0 0 0 1.506z" />
+                        </svg>
+                    </button>
+                    <label class="mx-5"> @recordName </label>
+                    <button class="btn btn-primary" @onclick="() => NextRecord()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-caret-right-fill" viewBox="0 0 16 16">
+                            <path d="m12.14 8.753-5.482 4.796c-.646.566-1.658.106-1.658-.753V3.204a1 1 0 0 1 1.659-.753l5.48 4.796a1 1 0 0 1 0 1.506z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="col m-auto">
+                <div class="row d-flex justify-content-center align-items-center @viewSelection">
+                    <div class="col">
+                        <div>
+                            <input type="checkbox" id="single" @bind="isSingle" @onclick="()=> ChangeView(1)">
+                            <label for="single">Single</label>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div>
+                            <input type="checkbox" id="multi" @bind="isMulti" @onclick="()=> ChangeView(2)">
+                            <label for="multi">Multi</label>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div>
+                            <input type="checkbox" id="overall" @bind="isOverall" @onclick="()=> ChangeView(3)">
+                            <label for="overall">Overall</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-2 shadow" style="height: 87%;">
+        <div class="container h-100">
+            <div class="row h-100">
+                <div class="col h-100 px-0">
+                   
+                        @if (recordModel.Student == null || recordModel.Student.Count()  == 0)
+                        {
+                            <img src="/images/no_data.jpg" class="d-block my-0 mx-auto mw-100 mh-100 h-100"/>
+                        }
+                        else
+                        {
+                            <div class="mh-100 h-100 table-responsive overflow-auto m-auto w-100">
+                                <table class="table table-bordered table-hover ">
+                                    <thead>
+                                        <tr class="header-stick @displayMulti">
+                                            <th class="name-stick name-header text-center align-content-center" rowspan="@(isMulti ? 2 : 1)">Name</th>
+                                            @if (writtenOutputs != null)
+                                            {
+                                                <th class="text-center record-header bg-written @(wrtOuts)" colspan="@(writtenOutputs.Count + 2)">
+                                                    WRITTEN TASK
+                                                </th>
+                                            }
+                                            @if (performanceOutputs != null)
+                                            {
+                                                <th class="text-center record-header bg-performance @(prfOuts)" colspan="@(performanceOutputs.Count + 2)">
+                                                    PERFORMANCE TASK
+                                                </th>
+                                            }
+                                            @if (periodicalOutputs != null)
+                                            {
+                                                <th class="text-center record-header bg-periodical @(prdOuts)" colspan="@(periodicalOutputs.Count + 2)">
+                                                    PERIODICAL TASK
+                                                </th>
+                                            }
+                                            <th class="text-center record-average bg-quarterly @(displayOverAll)">Initial<br /> Grade</th>
+                                            <th class="text-center record-average bg-quarterly @(displayOverAll)">Quarterly<br /> Grade</th>
+                                            <th class="text-center record-average bg-quarterly @(isSummary)">1st<br /> Quarter</th>
+                                            <th class="text-center record-average bg-quarterly @(isSummary)">2nd<br /> Quarter</th>
+                                            <th class="text-center record-average bg-quarterly @(isSummary)">3rd<br /> Quarter</th>
+                                            <th class="text-center record-average bg-quarterly @(isSummary)">4th<br /> Quarter</th>
+                                            <th class="text-center record-average bg-quarterly @(isSummary)">FINAL<br /> GRADE</th>
+                                            <th class="text-center record-average bg-quarterly @(isSummary)">REMARKS</th>
+                                            <th class="text-center record-average bg-rank @(displayOverAll)">Rank</th>
+                                            <th></th>
+                                        </tr>
+                                        <tr class="header-stick">
+                                            @if (!isMulti)
+                                            {
+                                                <th class="name-stick name-header text-center align-content-center">Name</th>
+                                            }
+                                            @if(writtenOutputs != null)
+                                            {
+                                                int counter = 1;
+                                                @foreach (var item in writtenOutputs)
+                                                {
+                                                    <th class="text-center record-header bg-written @(wrtOuts)"
+                                                        @onmouseover="() => OnMouseOver(item.WrittenOutputName)"
+                                                        @onmouseout="OnMouseOut"
+                                                        title="@hoverText">
+                                                        @((counter++).ToString("D2"))<br /><span class="@(isMulti ? "d-none":"")">WRTN<br /></span>Score: @item.MaxScore
+                                                    </th>
+                                                    
+                                                }
+                                            }
+                                            <th class="text-center record-header bg-written @(wrtTotal)">Total</th>
+                                            <th class="text-center record-average bg-written @(wrtAve)">Weighted<br /> Average</th>
+                                            @if (performanceOutputs != null)
+                                            {
+                                                int counter = 1;
+                                                @foreach (var item in performanceOutputs)
+                                                {
+                                                    <th class="text-center record-header bg-performance @(prfOuts)"
+                                                        @onmouseover="() => OnMouseOver(item.PerformanceOutputName)"
+                                                        @onmouseout="OnMouseOut"
+                                                        title="@hoverText">
+                                                        @((counter++).ToString("D2"))<br /><span class="@(isMulti ? "d-none":"")">PRFM<br /></span>Score: @item.MaxScore
+                                                        </th>
+                                                }
+                                                
+                                            }
+                                            <th class="text-center record-header bg-performance @(prfTotal)">Total</th>
+                                            <th class="text-center record-average bg-performance @(prfAve)">Weighted<br /> Average</th>
+                                            @if (periodicalOutputs != null)
+                                            {
+                                                int counter = 1;
+                                                @foreach (var item in periodicalOutputs)
+                                                {
+                                                    <th class="text-center record-header bg-periodical @(prdOuts)"
+                                                        @onmouseover="() => OnMouseOver(item.PeriodicalOutputName)"
+                                                        @onmouseout="OnMouseOut"
+                                                        title="@hoverText">
+                                                        @((counter++).ToString("D2"))<br /><span class="@(isMulti ? "d-none":"")">PRDL<br /></span>Score: @item.MaxScore
+                                                    </th>
+                                                   
+                                                }
+                                            }
+                                            <th class="text-center record-header bg-periodical @(prdTotal)">Total</th>
+                                            <th class="text-center record-average bg-periodical @(prdAve)">Weighted<br /> Average</th>
+                                            <th class="text-center record-average bg-quarterly @(displayOverAll)">Initial<br /> Grade</th>
+                                            <th class="text-center record-average bg-quarterly @(displayOverAll)">Quarterly<br /> Grade</th>
+                                            <th class="text-center record-average bg-quarterly @(isSummary)">1st<br /> Quarter</th>
+                                            <th class="text-center record-average bg-quarterly @(isSummary)">2nd<br /> Quarter</th>
+                                            <th class="text-center record-average bg-quarterly @(isSummary)">3rd<br /> Quarter</th>
+                                            <th class="text-center record-average bg-quarterly @(isSummary)">4th<br /> Quarter</th>
+                                            <th class="text-center record-average bg-quarterly @(isSummary)">FINAL<br /> GRADE</th>
+                                            <th class="text-center record-average bg-quarterly @(isSummary)">REMARKS</th>
+                                            <th class="text-center record-average bg-rank @(displayOverAll)">Rank</th>
+                                            <th></th>
+                                        </tr>
+                                        
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in recordModel.Student)
+                                        {
+                                            
+                                            <tr>
+                                                <td class="text-nowrap align-content-center">@($"{item.Lastname}, {item.Firstname} {item.Middlename}")</td>
+                                                @if (item.WrittenOutput != null)
+                                                {
+                                                    foreach (var keys in item.WrittenOutput)
+                                                    {
+                                                        <td class="text-center @(wrtOuts)">
+                                                        <input type="number" min="0" max="@keys.Value.MaxScore" pattern="^\d+$" class="form-control text-center align-content-center @(keys.Value.WrittenData.WrittenDataId == 0 ? "border-zero": "")" value="@keys.Value.WrittenData.Score" @onchange="(e) => AddUpdWRTRecord(e, keys.Value.WrittenData)"
+                                                               onkeypress="return (event.charCode !=8 && event.charCode ==0 || (event.charCode >= 48 && event.charCode <= 57))" />
+                                                        </td>
+                                                    }
+                                                }
+                                                <td class="text-center @(wrtTotal)">@item.TotalWrittenScore</td>
+                                                <td class="text-center @(wrtAve)"> @item.AverageWrittenScore.ToString("F2")</td>
+                                                @if (item.PerformanceOutput != null)
+                                                {
+                                                    foreach (var keys in item.PerformanceOutput)
+                                                    {
+                                                        <td class="text-center @(prfOuts) ">
+                                                            <input type="number" min="0" max="@keys.Value.MaxScore" class="form-control text-center align-content-center @(keys.Value.PerformanceData.PerformanceDataId == 0 ? "border-zero": "")" value="@keys.Value.PerformanceData.Score" @onchange="(e) => AddUpdPRFRecord(e, keys.Value.PerformanceData)" />
+                                                        </td>
+                                                    }
+                                                }
+                                                <td class="text-center @(prfTotal)">@item.TotalPerformanceScore</td>
+                                                <td class="text-center @(prfAve)">@item.AveragePerformanceScore.ToString("F2")</td>
+                                                @if (item.PeriodicalOutput != null)
+                                                {
+                                                    foreach (var keys in item.PeriodicalOutput)
+                                                    {
+                                                        <td class="text-center @(prdOuts)">
+                                                            <input type="number" min="0" max="@keys.Value.MaxScore" class="form-control text-center align-content-center @(keys.Value.PeriodicalData.PeriodicalDataId == 0 ? "border-zero": "")" value="@keys.Value.PeriodicalData.Score" @onchange="(e) => AddUpdPRDRecord(e, keys.Value.PeriodicalData)" />
+                                                        </td>
+                                                    }
+                                                }
+                                                <td class="text-center @(prdTotal)">@item.TotalPeridiocialScore</td>
+                                                <td class="text-center @(prdAve)">@item.AveragePeriodicalScore.ToString("F2")</td>
+                                                <td class="text-center record-average @(displayOverAll)">@item.InitialGrade.ToString("F2")</td>
+                                                <td class="text-center record-average @(displayOverAll)">@item.QuarterlyGrade</td>
+                                                @if (item.Quarters != null)
+                                                {
+                                                    totalGrade = 0;
+                                                    foreach(var keys in item.Quarters)
+                                                    {
+                                                        totalGrade += keys.Value.Grade;
+                                                        <td class="text-center  @(isSummary)">@keys.Value.Grade</td>
+                                                    
+                                                    }
+                                                }
+                                                <td class="text-center  @(isSummary)">@item.FinalGrade</td>
+                                                <td class="text-center  @(isSummary)">@item.GradeRemarks</td>
+
+                                                <td class="text-center record-average @(displayOverAll)">@item.Rank</td>
+                                                <td></td>
+                                            </tr>
+                                        }
+                                        <tr class="header-stick @displayMulti">
+                                            <th class="name-stick name-header text-center align-content-center" rowspan="@(isMulti ? 2 : 1)">Summary</th>
+                                            @if (writtenOutputs != null)
+                                            {
+                                                <th class="text-center record-header bg-written @(wrtOuts)" colspan="@(writtenOutputs.Count + 2)">
+                                                    WRITTEN TASK
+                                                </th>
+                                            }
+                                            @if (performanceOutputs != null)
+                                            {
+                                                <th class="text-center record-header bg-performance @(prfOuts)" colspan="@(performanceOutputs.Count + 2)">
+                                                    PERFORMANCE TASK
+                                                </th>
+                                            }
+                                            @if (periodicalOutputs != null)
+                                            {
+                                                <th class="text-center record-header bg-periodical @(prdOuts)" colspan="@(periodicalOutputs.Count + 2)">
+                                                    PERIODICAL TASK
+                                                </th>
+                                            }
+                                            <th></th>
+                                        </tr>
+                                        <tr class="header-stick @(isOverall ? "d-none":displaySummary)">
+                                            @if (!isMulti)
+                                            {
+                                                <th class="name-stick name-header text-center align-content-center">Summary</th>
+                                            }
+                                            @if (writtenOutputs != null)
+                                            {
+                                                int counter = 1;
+                                                @foreach (var item in writtenOutputs)
+                                                {
+                                                    <th class="text-center record-header bg-written @(wrtOuts)"
+                                                        @onmouseover="() => OnMouseOver(item.WrittenOutputName)"
+                                                        @onmouseout="OnMouseOut"
+                                                        title="@hoverText">
+                                                        @((counter++).ToString("D2"))<br /><span class="@(isMulti ? "d-none":"")">WRTN</span>
+                                                    </th>
+
+                                                }
+                                            }
+                                            <th class="text-center record-average bg-written align-content-center @(wrtOuts)" colspan="2">Sum/Average</th>
+                                            @if (performanceOutputs != null)
+                                            {
+                                                int counter = 1;
+                                                @foreach (var item in performanceOutputs)
+                                                {
+                                                    <th class="text-center record-header bg-performance @(prfOuts)"
+                                                        @onmouseover="() => OnMouseOver(item.PerformanceOutputName)"
+                                                        @onmouseout="OnMouseOut"
+                                                        title="@hoverText">
+                                                        @((counter++).ToString("D2"))<br /><span class="@(isMulti ? "d-none":"")">PRFM</span>
+                                                    </th>
+                                                }
+
+                                            }
+                                            <th class="text-center record-average bg-performance align-content-center @(prfOuts)" colspan="2">Sum/Average</th>
+                                            @if (periodicalOutputs != null)
+                                            {
+                                                int counter = 1;
+                                                @foreach (var item in periodicalOutputs)
+                                                {
+                                                    <th class="text-center record-header bg-periodical @(prdOuts)"
+                                                        @onmouseover="() => OnMouseOver(item.PeriodicalOutputName)"
+                                                        @onmouseout="OnMouseOut"
+                                                        title="@hoverText">
+                                                        @((counter++).ToString("D2"))<br /><span class="@(isMulti ? "d-none":"")">PRDL</span>
+                                                    </th>
+
+                                                }
+                                            }
+                                            <th class="text-center record-average bg-periodical align-content-center @(prdOuts)" colspan="2">Sum/Average</th>
+                                            <th></th>
+                                        </tr>
+
+                                        <tr class="@(isOverall ? "d-none":displaySummary)">
+                                           <td class="text-center text-nowrap fw-bold">How many SUBMITTED outputs</td>
+                                            @if (summaryOuputs.WrittenSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.WrittenSumOutput)
+                                                {
+                                                    total += @item.Value.doSubmit;
+                                                    <td class="text-center @(wrtOuts)">@item.Value.doSubmit</td>
+                                                }
+                                                <td class="text-center @(wrtOuts)" colspan="2">@total</td>
+                                            }
+                                            
+                                            @if (summaryOuputs.PerformanceSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.PerformanceSumOutput)
+                                                {
+                                                    total += @item.Value.doSubmit;
+                                                    <td class="text-center @(prfOuts)">@item.Value.doSubmit</td>
+                                                }
+                                                <td class="text-center @(prfOuts)" colspan="2">@total</td>
+                                            }
+                                            @if (summaryOuputs.PeriodicalSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.PeriodicalSumOutput)
+                                                {
+                                                    total += @item.Value.doSubmit;
+                                                    <td class="text-center @(prdOuts)">@item.Value.doSubmit</td>
+                                                }
+                                                <td class="text-center @(prdOuts)" colspan="2">@total</td>
+                                            }
+                                       </tr>
+                                        <tr class="@(isOverall ? "d-none":displaySummary)">
+                                            <td class="text-center text-nowrap fw-bold">NO SUBMISSION YET</td>
+                                            @if (summaryOuputs.WrittenSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.WrittenSumOutput)
+                                                {
+                                                    total += @item.Value.doesntSubmit;
+                                                    <td class="text-center @(wrtOuts)">@item.Value.doesntSubmit</td>
+                                                }
+                                                <td class="text-center @(wrtOuts)" colspan="2">@total</td>
+                                            }
+
+                                            @if (summaryOuputs.PerformanceSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.PerformanceSumOutput)
+                                                {
+                                                    total += @item.Value.doesntSubmit;
+                                                    <td class="text-center @(prfOuts)">@item.Value.doesntSubmit</td>
+                                                }
+                                                <td class="text-center @(prfOuts)" colspan="2">@total</td>
+                                            }
+                                            @if (summaryOuputs.PeriodicalSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.PeriodicalSumOutput)
+                                                {
+                                                    total += @item.Value.doesntSubmit;
+                                                    <td class="text-center @(prdOuts)">@item.Value.doesntSubmit</td>
+                                                }
+                                                <td class="text-center @(prdOuts)" colspan="2">@total</td>
+                                            }
+                                        </tr>
+                                        <tr class="@(isOverall ? "d-none":displaySummary)">
+                                            <td class="text-center text-nowrap fw-bold">How many got ZERO</td>
+                                            @if (summaryOuputs.WrittenSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.WrittenSumOutput)
+                                                {
+                                                    total += @item.Value.gotZero;
+                                                    <td class="text-center @(wrtOuts)">@item.Value.gotZero</td>
+                                                }
+                                                <td class="text-center @(wrtOuts)" colspan="2">@total</td>
+                                            }
+
+                                            @if (summaryOuputs.PerformanceSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.PerformanceSumOutput)
+                                                {
+                                                    total += @item.Value.gotZero;
+                                                    <td class="text-center @(prfOuts)">@item.Value.gotZero</td>
+                                                }
+                                                <td class="text-center @(prfOuts)" colspan="2">@total</td>
+                                            }
+                                            @if (summaryOuputs.PeriodicalSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.PeriodicalSumOutput)
+                                                {
+                                                    total += @item.Value.gotZero;
+                                                    <td class="text-center @(prdOuts)">@item.Value.gotZero</td>
+                                                }
+                                                <td class="text-center @(prdOuts)" colspan="2">@total</td>
+                                            }
+                                        </tr>
+                                         <tr class="@(isOverall ? "d-none":displaySummary)">
+                                            <td class="text-center text-nowrap fw-bold">Possible Perfect Score for the Activity</td>
+                                            @if (summaryOuputs.WrittenSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.WrittenSumOutput)
+                                                {
+                                                    total += @item.Value.maxScore;
+                                                    <td class="text-center @(wrtOuts)">@item.Value.maxScore</td>
+                                                }
+                                                <td class="text-center @(wrtOuts)" colspan="2">@total</td>
+                                            }
+
+                                            @if (summaryOuputs.PerformanceSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.PerformanceSumOutput)
+                                                {
+                                                    total += @item.Value.maxScore;
+                                                    <td class="text-center @(prfOuts)">@item.Value.maxScore</td>
+                                                }
+                                                <td class="text-center @(prfOuts)" colspan="2">@total</td>
+                                            }
+                                            @if (summaryOuputs.PeriodicalSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.PeriodicalSumOutput)
+                                                {
+                                                    total += @item.Value.maxScore;
+                                                    <td class="text-center @(prdOuts)">@item.Value.maxScore</td>
+                                                }
+                                                <td class="text-center @(prdOuts)" colspan="2">@total</td>
+                                            }
+                                        </tr>
+                                        <tr class="@(isOverall ? "d-none":displaySummary)">
+                                            <td class="text-center text-nowrap fw-bold">AVERAGE SCORE OF THE CLASS</td>
+                                            @if (summaryOuputs.WrittenSumOutput != null)
+                                            {
+                                                double total = 0;
+                                                @foreach (var item in summaryOuputs.WrittenSumOutput)
+                                                {
+                                                    total += @item.Value.avgScore;
+                                                    <td class="text-center @(wrtOuts)">@item.Value.avgScore.ToString("F2")</td>
+                                                }
+                                                <td class="text-center @(wrtOuts)" colspan="2">@total.ToString("F2")</td>
+                                            }
+
+                                            @if (summaryOuputs.PerformanceSumOutput != null)
+                                            {
+                                                double total = 0;
+                                                @foreach (var item in summaryOuputs.PerformanceSumOutput)
+                                                {
+                                                    total += @item.Value.avgScore;
+                                                    <td class="text-center @(prfOuts)">@item.Value.avgScore.ToString("F2")</td>
+                                                }
+                                                <td class="text-center @(prfOuts)" colspan="2">@total.ToString("F2")</td>   
+                                            }
+                                            @if (summaryOuputs.PeriodicalSumOutput != null)
+                                            {
+                                                double total = 0;
+                                                @foreach (var item in summaryOuputs.PeriodicalSumOutput)
+                                                {
+                                                    total += @item.Value.avgScore;
+                                                    <td class="text-center @(prdOuts)">@item.Value.avgScore.ToString("F2")</td>
+                                                }
+                                                <td class="text-center @(prdOuts)" colspan="2">@total.ToString("F2")</td>
+                                            }
+                                        </tr>
+                                        <tr class="@(isOverall ? "d-none": displaySummary)">
+                                            <td class="text-center text-nowrap fw-bold">MPS</td>
+                                            @if (summaryOuputs.WrittenSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.WrittenSumOutput)
+                                                {
+                                                    total += @item.Value.mps;
+                                                    <td class="text-center @(wrtOuts)">@item.Value.mps</td>
+                                                }
+                                                <td class="text-center @(wrtOuts)" colspan="2">@total</td>
+                                            }
+
+                                            @if (summaryOuputs.PerformanceSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.PerformanceSumOutput)
+                                                {
+                                                    total += @item.Value.mps;
+                                                    <td class="text-center @(prfOuts)">@item.Value.mps</td>
+                                                }
+                                                <td class="text-center @(prfOuts)" colspan="2">@total</td>
+                                            }
+                                            @if (summaryOuputs.PeriodicalSumOutput != null)
+                                            {
+                                                int total = 0;
+                                                @foreach (var item in summaryOuputs.PeriodicalSumOutput)
+                                                {
+                                                    total += @item.Value.mps;
+                                                    <td class="text-center @(prdOuts)">@item.Value.mps</td>
+                                                }
+                                                <td class="text-center @(prdOuts)" colspan="2">@total</td>
+                                            }
+                                        </tr>
+                                        <tr class="@(isOverall ? "d-none":displaySummary)">
+                                            <td class="text-center text-nowrap fw-bold">STANDARD DEVIATION</td>
+                                            @if (summaryOuputs.WrittenSumOutput != null)
+                                            {
+                                                double total = 0;
+                                                @foreach (var item in summaryOuputs.WrittenSumOutput)
+                                                {
+                                                    total += @item.Value.deviation;
+                                                    <td class="text-center @(wrtOuts)">@item.Value.deviation.ToString("F2")</td>
+                                                }
+                                                <td class="text-center @(wrtOuts)" colspan="2">@total.ToString("F2")</td>
+                                            }
+
+                                            @if (summaryOuputs.PerformanceSumOutput != null)
+                                            {
+                                                double total = 0;
+                                                @foreach (var item in summaryOuputs.PerformanceSumOutput)
+                                                {
+                                                    total += @item.Value.deviation;
+                                                    <td class="text-center @(prfOuts)">@item.Value.deviation.ToString("F2")</td>
+                                                }
+                                                <td class="text-center @(prfOuts)" colspan="2">@total.ToString("F2")</td>
+                                            }
+                                            @if (summaryOuputs.PeriodicalSumOutput != null)
+                                            {
+                                                double total = 0;
+                                                @foreach (var item in summaryOuputs.PeriodicalSumOutput)
+                                                {
+                                                    total += @item.Value.deviation;
+                                                    <td class="text-center @(prdOuts)">@item.Value.deviation.ToString("F2")</td>
+                                                }
+                                                <td class="text-center @(prdOuts)" colspan="2">@total.ToString("F2")</td>
+                                            }
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        }
+                  
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row" style="height: 5%;">
+        <div class="row h-auto">
+            <div class="legend d-flex flex-row mt-2 @outputView">
+                <button type="button" class="btn btn-primary" data-bs-target="#writtensearch" data-bs-toggle="modal" @onclick="() => LoadDatas(1)">Written</button>
+                <button type="button" class="btn btn-primary mx-3" data-bs-target="#performancesearch" data-bs-toggle="modal" @onclick="() => LoadDatas(2)">Performance</button>
+                <button type="button" class="btn btn-primary" data-bs-target="#periodicalsearch" data-bs-toggle="modal" @onclick="() => LoadDatas(3)">Periodical</button>
+                <div class="btn-group dropup ms-3">
+                    <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Weighted Scores
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" data-bs-target="#weightedscores" data-bs-toggle="modal" @onclick="() => LoadScores()">Load Weighted Scores</a></li>
+                        <li><a class="dropdown-item" data-bs-target="#addweightedscores" data-bs-toggle="modal" @onclick="() => LoadDatas(0)">Add Weighted Scores</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="writtensearch" aria-hidden="true" aria-labelledby="writtensearchLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="writtensearchLabel2">Written Outputs</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if(wrtOutputlist == null || wrtOutputlist.Count() == 0){
+                    <img src="/images/no_data.jpg" class="d-block my-0 mx-auto mw-100 mh-100 h-100" width="250px" height="250px"/>
+                }
+                else
+                {
+                    <div class="w-100 m-auto d-flex flex-row">
+                        <div class="w-50 overflow-auto">
+                            <QuickGrid Class="table table-hover table-responsive mt-0" Items="@wrtOutputlist" Theme="corporate">
+                                    <PropertyColumn Property="written => (written.WrittenOutputName)" Title="Name" Class="student-namefilter align-items-center" Sortable="true" />
+                                    <TemplateColumn Context="written" Title="Actions" Class="justify-content-evenly border-0">
+                                    <button class="btn text-success" @onclick="() => LoadWrittenOutput(written)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16">
+                                                <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z" />
+                                            </svg>
+                                        </button>
+                                        <button class="btn text-danger" data-bs-target="#confirmationmodal" data-bs-toggle="modal" @onclick="() => SetDataforDelete(written.WrittenOutputID, 1)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-archive-fill" viewBox="0 0 16 16">
+                                                <path d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15zM5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1M.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8z" />
+                                            </svg>
+                                        </button>
+                                    </TemplateColumn>
+                                </QuickGrid>
+                        </div>
+                        <div class="w-50 ms-2">
+                            <EditForm Model="writtenOutputlist">
+                                <DataAnnotationsValidator />
+                                <div class="row">
+                                    <div class="col my-2">
+                                        <form class="form-floating">
+                                            <input type="text" class="form-control" id="outputname" @bind="writtenOutputlist.WrittenOutputName" placeholder="Output Name" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                            <label for="outputname">Output</label>
+                                        </form>
+                                    </div>
+                                </div>
+                                <div class="row my-2">
+                                    <div class="col my-2">
+                                        <form class="form-floating">
+                                            <select class="form-control" id="quarter" @bind="writtenOutputlist.QuarterID">
+                                                @foreach (var quar in quarteradd)
+                                                {
+                                                    <option value="@quar.QuarterID">@quar.QuarterName</option>
+                                                }
+                                            </select>
+                                            <label for="quarter">Quarter</label>
+                                        </form>
+                                    </div>
+                                    <div class="col my-2">
+                                        <form class="form-floating">
+                                            <input type="text" class="form-control" id="outputscore" @bind="writtenOutputlist.MaxScore" placeholder="Max Score" onkeypress="return (event.charCode !=8 && event.charCode ==0 || (event.charCode >= 48 && event.charCode <= 57))">
+                                            <label for="outputscore">Max Score</label>
+                                        </form>
+                                    </div>
+                                </div>
+                            </EditForm>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" disabled="@IsAnyRequiredFieldEmpty(1)" @onclick="() => UpdateWrittenOutput(writtenOutputlist)">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="performancesearch" aria-hidden="true" aria-labelledby="performancesearchLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="performancesearchLabel2">Performance Outputs</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if(prfOutputlist == null || prfOutputlist.Count() == 0){
+                    <img src="/images/no_data.jpg" class="d-block my-0 mx-auto mw-100 mh-100 h-100" width="250px" height="250px"/>
+                }
+                else
+                {
+                <div class="w-100 m-auto d-flex flex-row">
+                    <div class="w-50 overflow-auto">
+                        <QuickGrid Class="table table-hover table-responsive mt-0" Items="@prfOutputlist" Theme="corporate">
+                            <PropertyColumn Property="performance => (performance.PerformanceOutputName)" Title="Name" Class="student-namefilter align-items-center" Sortable="true" />
+                            <TemplateColumn Context="performance" Title="Actions" Class="justify-content-evenly border-0">
+                                <button class="btn text-success" @onclick="() => LoadPerformanceOutput(performance)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16" >
+                                        <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z" />
+                                    </svg>
+                                </button>
+                                    <button class="btn text-danger" data-bs-target="#confirmationmodal" data-bs-toggle="modal" @onclick="() => SetDataforDelete(performance.PerformanceOutputID, 2)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-archive-fill" viewBox="0 0 16 16">
+                                        <path d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15zM5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1M.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8z" />
+                                    </svg>
+                                </button>
+                            </TemplateColumn>
+                        </QuickGrid>
+                        
+                    </div>
+                    <div class="w-50 ms-2">
+                        <EditForm Model="performanceOutputlist">
+                            <DataAnnotationsValidator />
+                            <div class="row">
+                                <div class="col my-2">
+                                    <form class="form-floating">
+                                            <input type="text" class="form-control" id="outputname" @bind="performanceOutputlist.PerformanceOutputName" placeholder="Output Name" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                        <label for="outputname">Output Name</label>
+                                    </form>
+                                </div>
+                            </div>
+                            <div class="row my-2">
+                                <div class="col my-2">
+                                    <form class="form-floating">
+                                        <select class="form-control" id="quarter" @bind="performanceOutputlist.QuarterID">
+                                            @foreach (var quar in quarteradd)
+                                            {
+                                                <option value="@quar.QuarterID">@quar.QuarterName</option>
+                                            }
+                                        </select>
+                                        <label for="quarter">Quarter</label>
+                                    </form>
+                                </div>
+                                <div class="col my-2">
+                                    <form class="form-floating">
+                                        <input type="text" class="form-control" id="outputscore" @bind="performanceOutputlist.MaxScore" placeholder="Max Score" onkeypress="return (event.charCode !=8 && event.charCode ==0 || (event.charCode >= 48 && event.charCode <= 57))">
+                                        <label for="outputscore">Max Score</label>
+                                    </form>
+                                </div>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" disabled="@IsAnyRequiredFieldEmpty(2)" @onclick="() => UpdatePerformanceOutput(performanceOutputlist)">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="periodicalsearch" aria-hidden="true" aria-labelledby="periodicalsearchLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="periodicalsearchLabel2">Performance Outputs</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if (prdOutputlist == null || prdOutputlist.Count() == 0)
+                {
+                    <img src="/images/no_data.jpg" class="d-block my-0 mx-auto mw-100 mh-100 h-100" width="250px" height="250px"/>
+                }
+                else
+                {
+                <div class="w-100 m-auto d-flex flex-row">
+                    <div class="w-50 overflow-auto">
+                        <QuickGrid Class="table table-hover table-responsive mt-0" Items="@prdOutputlist" Theme="corporate">
+                            <PropertyColumn Property="periodical => (periodical.PeriodicalOutputName)" Title="Name" Class="student-namefilter align-items-center" Sortable="true" />
+                            <TemplateColumn Context="periodical" Title="Actions" Class="justify-content-evenly border-0">
+                                <button class="btn text-success" @onclick="() => LoadPeriodicalOutput(periodical)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16" >
+                                        <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z" />
+                                    </svg>
+                                </button>
+                                @* <button class="btn text-danger" data-bs-dismiss="modal" @onclick="() => DeletePeriodicalOutput(periodical.PeriodicalOutputID)" > *@
+                                    <button class="btn text-danger" data-bs-target="#confirmationmodal" data-bs-toggle="modal" @onclick="() => SetDataforDelete(periodical.PeriodicalOutputID, 3)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-archive-fill" viewBox="0 0 16 16">
+                                        <path d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15zM5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1M.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8z" />
+                                    </svg>
+                                </button>
+                            </TemplateColumn>
+                        </QuickGrid>
+
+                    </div>
+                    <div class="w-50 ms-2">
+                        <EditForm Model="periodicalOutputlist">
+                            <DataAnnotationsValidator />
+                            <div class="row">
+                                <div class="col my-2">
+                                    <form class="form-floating">
+                                            <input type="text" class="form-control" id="outputname" @bind="periodicalOutputlist.PeriodicalOutputName" placeholder="Output Name" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                        <label for="outputname">Output Name</label>
+                                    </form>
+                                </div>
+                            </div>
+                            <div class="row my-2">
+                                <div class="col my-2">
+                                    <form class="form-floating">
+                                        <select class="form-control" id="quarter" @bind="periodicalOutputlist.QuarterID">
+                                            @foreach (var quar in quarteradd)
+                                            {
+                                                <option value="@quar.QuarterID">@quar.QuarterName</option>
+                                            }
+                                        </select>
+                                        <label for="quarter">Quarter</label>
+                                    </form>
+                                </div>
+                                <div class="col my-2">
+                                    <form class="form-floating">
+                                        <input type="text" class="form-control" id="outputscore" @bind="periodicalOutputlist.MaxScore" placeholder="Max Score" onkeypress="return (event.charCode !=8 && event.charCode ==0 || (event.charCode >= 48 && event.charCode <= 57))">
+                                        <label for="outputscore">Max Score</label>
+                                    </form>
+                                </div>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" disabled="@IsAnyRequiredFieldEmpty(3)" @onclick="() => UpdatePeriodicalOutput(periodicalOutputlist)">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="weightedscores" aria-hidden="true" aria-labelledby="weightedscoresLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="weightedscoresLabel2">Weighted Scores</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if (weighted == null || weighted.Count() == 0)
+                {
+                    <img src="/images/no_data.jpg" class="d-block my-0 mx-auto mw-100 mh-100 h-100" width="250px" height="250px"/>
+                }
+                else
+                {
+                <div class="w-100 m-auto d-flex flex-row">
+                    <div class="w-50 overflow-auto">
+                            <QuickGrid Class="table table-hover table-responsive mt-0" Items="@weighted" Theme="corporate">
+                                <PropertyColumn Property="scores => (scores.OutputName)" Title="Name" Class="student-namefilter align-items-center" Sortable="true"/>
+                                <PropertyColumn Property="scores => (scores.Score)" Title="Score" Class="student-namefilter align-items-center" Sortable="true"/>
+                                <TemplateColumn Context="scores" Title="Actions" Class="justify-content-evenly border-0">
+                                    <button class="btn text-success" @onclick="() => LoadScoresOutput(scores)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16">
+                                            <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z" />
+                                        </svg>
+                                    </button>
+                                    <button class="btn text-danger" data-bs-target="#confirmationmodal" data-bs-toggle="modal" @onclick="() => SetDataforDelete(scores.WeightedScoreID, 4)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-archive-fill" viewBox="0 0 16 16">
+                                            <path d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15zM5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1M.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8z" />
+                                        </svg>
+                                    </button>
+                                </TemplateColumn>
+                            </QuickGrid>
+                       
+                    </div>
+                    <div class="w-50 ms-2">
+                        <EditForm Model="scorelist">
+                            <DataAnnotationsValidator />
+                            <div class="row">
+                                <div class="col my-2">
+                                        <form class="form-floating m-2">
+                                            @if (outputlist != null)
+                                            {
+                                                <select class="form-control" id="outputname" @bind="scorelist.OutputID">
+                                                    <option selected hidden>Please select Output Name</option>
+                                                    @foreach (var item in outputlist)
+                                                    {
+                                                        <option value="@item.OutputID">@item.OutputName</option>
+                                                    }
+                                                </select>
+                                                <label for="outputname">Output Name</label>
+                                            }
+                                        </form>
+                                </div>
+                            </div>
+                            <div class="row my-2">
+                                <div class="col my-2">
+                                        @if (schoolYearlist != null)
+                                        {
+                                            <select class="form-control w-auto" id="schyear" @bind="scorelist.SchoolYearID">
+                                                <option selected hidden>Please select SchoolYear</option>
+                                                @foreach (var item in schoolYearlist)
+                                                {
+                                                    <option value="@item.SchoolYearID">@item.SchoolYearName</option>
+                                                }
+                                            </select>
+                                        }
+                                </div>
+                                <div class="col my-2">
+                                    <form class="form-floating">
+                                            <input type="number" step="any" class="form-control" id="outputscore" @bind="scorelist.Score" placeholder="Score" onkeypress="if(event.key === 'e' || event.key === 'E') event.preventDefault();">
+                                        <label for="outputscore">Score</label>
+                                    </form>
+                                </div>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" disabled="@IsAnyRequiredFieldEmpty(5)" @onclick="() => UpdateWeightedScore(scorelist)">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="writtenadd" aria-hidden="true" aria-labelledby="writtenaddLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="writtenaddLabel2">Add Written Output</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="w-100 m-auto d-flex flex-row">
+                    <EditForm Model="writtenOutputlist" class="w-100">
+                        <DataAnnotationsValidator />
+                            <div class="row">
+                                <div class="col my-2">
+                                    <form class="form-floating">
+                                    <input type="text" class="form-control" id="outputname" @bind="writtenOutputlist.WrittenOutputName" placeholder="Output Name" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                        <label for="outputname">Output Name</label>
+                                    </form>
+                                </div>
+                            </div>
+                            <div class="row my-2">
+                                <div class="col my-2">
+                                    <form class="form-floating">
+                                    <select class="form-control" id="quarter" @bind="writtenOutputlist.QuarterID">
+                                            <option selected hidden>Please select Quarter</option>
+                                            @foreach (var item in quarteradd)
+                                            {
+                                                <option value="@item.QuarterID">@item.QuarterName</option>
+                                            }
+                                        </select>
+                                        <label for="quarter">Quarter</label>
+                                    </form>
+                                </div>
+                                <div class="col my-2">
+                                    <form class="form-floating">
+                                    <input type="text" class="form-control" id="outputscore" @bind="writtenOutputlist.MaxScore" placeholder="Max Score" onkeypress="return (event.charCode !=8 && event.charCode ==0 || (event.charCode >= 48 && event.charCode <= 57))">
+                                        <label for="outputscore">Max Score</label>
+                                    </form>
+                                </div>
+                            </div>
+                    </EditForm>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" disabled="@IsAnyRequiredFieldEmpty(6)" @onclick="() => AddWrittenOutput(writtenOutputlist)">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="performanceadd" aria-hidden="true" aria-labelledby="performanceaddLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="performanceaddLabel2">Add Performance Output</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="w-100 m-auto d-flex flex-row">
+                    <EditForm Model="performanceOutputlist" class="w-100">
+                        <DataAnnotationsValidator />
+                        <div class="row">
+                            <div class="col my-2">
+                                <form class="form-floating">
+                                    <input type="text" class="form-control" id="outputname" @bind="performanceOutputlist.PerformanceOutputName" placeholder="Output Name" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                    <label for="outputname">Output Name</label>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="row my-2">
+                            <div class="col my-2">
+                                <form class="form-floating">
+                                    <select class="form-control" id="quarter" @bind="performanceOutputlist.QuarterID">
+                                        <option selected hidden>Please select Quarter</option>
+                                        @foreach (var item in quarteradd)
+                                        {
+                                            <option value="@item.QuarterID">@item.QuarterName</option>
+                                        }
+                                    </select>
+                                    <label for="quarter">Quarter</label>
+                                </form>
+                            </div>
+                            <div class="col my-2">
+                                <form class="form-floating">
+                                    <input type="text" class="form-control" id="outputscore" @bind="performanceOutputlist.MaxScore" placeholder="Max Score" onkeypress="return (event.charCode !=8 && event.charCode ==0 || (event.charCode >= 48 && event.charCode <= 57))">
+                                    <label for="outputscore">Max Score</label>
+                                </form>
+                            </div>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" disabled="@IsAnyRequiredFieldEmpty(7)" @onclick="() => AddPerformanceOutput(performanceOutputlist)">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="periodicaladd" aria-hidden="true" aria-labelledby="periodicaladdLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="periodicaladdLabel2">Add Periodical Output</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="w-100 m-auto d-flex flex-row">
+                    <EditForm Model="periodicalOutputlist" class="w-100">
+                        <DataAnnotationsValidator />
+                        <div class="row">
+                            <div class="col my-2">
+                                <form class="form-floating">
+                                    <input type="text" class="form-control" id="outputname" @bind="periodicalOutputlist.PeriodicalOutputName" placeholder="Output Name" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                    <label for="outputname">Output Name</label>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="row my-2">
+                            <div class="col my-2">
+                                <form class="form-floating">
+                                    <select class="form-control" id="quarter" @bind="periodicalOutputlist.QuarterID">
+                                        <option selected hidden>Please select Quarter</option>
+                                        @foreach (var item in quarteradd)
+                                        {
+                                            <option value="@item.QuarterID">@item.QuarterName</option>
+                                        }
+                                    </select>
+                                    <label for="quarter">Quarter</label>
+                                </form>
+                            </div>
+                            <div class="col my-2">
+                                <form class="form-floating">
+                                    <input type="text" class="form-control" id="outputscore" @bind="periodicalOutputlist.MaxScore" placeholder="Max Score" onkeypress="return (event.charCode !=8 && event.charCode ==0 || (event.charCode >= 48 && event.charCode <= 57))">
+                                    <label for="outputscore">Max Score</label>
+                                </form>
+                            </div>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" disabled="@IsAnyRequiredFieldEmpty(8)" @onclick="(e) => AddPeriodicalOutput(periodicalOutputlist)">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addweightedscores" aria-hidden="true" aria-labelledby="addweightedscoresLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="addweightedscoresLabel2">Add Weighted Scores</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="w-100 m-auto d-flex flex-row">
+                    <EditForm Model="scorelist" class="w-100">
+                        <DataAnnotationsValidator />
+                        <div class="row">
+                            <div class="col my-2">
+                                <form class="form-floating">
+                                    <select class="form-control" id="output" @bind="scorelist.OutputID">
+                                        <option selected hidden>Please select Output Type</option>
+                                        @foreach (var item in outputlist)
+                                        {
+                                            <option value="@item.OutputID">@item.OutputName</option>
+                                        }
+                                    </select>
+                                    <label for="output">Output</label>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="row my-2">
+                            <div class="col my-2">
+                                <form class="form-floating">
+                                    <input type="number" step="any" class="form-control" id="outputscore" @bind="scorelist.Score" placeholder="Score" onkeypress="if(event.key === 'e' || event.key === 'E') event.preventDefault();">
+                                    <label for="outputscore">Score</label>
+                                </form>
+                            </div>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" @onclick="(e) => AddWeightedScore(scorelist)" disabled="@IsAnyRequiredFieldEmpty(4)">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="distribution" aria-hidden="true" aria-labelledby="distributionLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="distributionLabel2">Grade Distribution - Summary of Grades</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                 <Chart Config="_config" @ref="_chart"></Chart>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" disabled="@IsAnyRequiredFieldEmpty(6)" @onclick="() => AddWrittenOutput(writtenOutputlist)">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" tabindex="-1" id="confirmationmodal" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Record Confirmation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" @onclick="() => DeleteReset()"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the record?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" @onclick="() => DeleteReset()">Cancel</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" @onclick="() => DeleteConfirm()">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="position-fixed btnadd @btnAddoutput">
+    <div class="me-1">
+        <button class="btn btn-primary dropdown-toggle btn-studentadd text-center align-content-center justify-content-center justify-content-between" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-person-fill-add" viewBox="0 0 16 16">
+                <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0" />
+                <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4" />
+            </svg>
+        </button>
+        <div class="dropdown-menu dropdown-menu-start w-100" style="background-color: transparent; border-style: none; max-width: 55px;">
+            <div class="row">
+                <div class="col"></div>
+                <div class="col"></div>
+                <div class="col">
+                    <button class="btn btn-secondary mb-1 btn-writtenAdd" data-bs-target="#writtenadd" data-bs-toggle="modal" type="button" @onclick="() => LoadDatas(0)">WRT</button>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col"></div>
+                <div class="col"></div>
+                <div class="col">
+                    <button class="btn btn-secondary mb-1 btn-performanceAdd" data-bs-target="#performanceadd" data-bs-toggle="modal" type="button" @onclick="() => LoadDatas(0)">PRF</button>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col"></div>
+                <div class="col"></div>
+                <div class="col">
+                    <button class="btn btn-secondary mb-1 btn-periodicalAdd" data-bs-target="#periodicaladd" data-bs-toggle="modal" type="button" @onclick="() => LoadDatas(0)">PRD</button>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+@code {
+    private const int InitalCount = 7;
+    private BarConfig _config;
+    private Random _rng = new Random();
+    private Chart _chart;
+
+    private static readonly List<string> Months = new List<string>
+    {
+        "98-100", "95-97", "90-94", "85-89","80-84", "75-79", "60-74"
+    };
+
+    public static class ChartColors
+    {
+        public static readonly string Red = "rgba(255, 99, 132, 1)";
+        public static readonly string Blue = "rgba(54, 162, 235, 1)";
+        public static readonly string Yellow = "rgba(255, 206, 86, 1)";
+        public static readonly string Green = "rgba(75, 192, 192, 1)";
+        public static readonly string Purple = "rgba(153, 102, 255, 1)";
+        public static readonly string Orange = "rgba(255, 159, 64, 1)";
+
+        public static readonly List<string> All = new List<string>
+        {
+            Red, Blue, Yellow, Green, Purple, Orange
+        };
+    }
+
+
+    private string recordName;
+    private bool isSingle = false;
+    private bool isMulti = false;
+    private bool isOverall = false;
+    List<Quarter> quarterlist = new();
+    List<Quarter> quarteradd = new();
+    List<Outputs> outputlist = new();
+    RecordModel recordModel = new();
+    SummaryOutputs summaryOuputs = new();
+    private int totalCount = 0;
+    private double totalWRT = 0;
+    private double totalPRF = 0;
+    private double totalPRD = 0;
+    List<WrittenOutput> writtenOutputs = new();
+    List<PerformanceOutput> performanceOutputs = new();
+    List<PeriodicalOutput> periodicalOutputs = new();
+    private string nameFilter;
+    IQueryable<SchoolYear> schoolYearlist = Enumerable.Empty<SchoolYear>().AsQueryable();
+
+
+    WrittenOutput writtenOutputlist = new();
+    IQueryable<WrittenOutput> written = Enumerable.Empty<WrittenOutput>().AsQueryable();
+    IQueryable<WrittenOutput> wrtOutputlist
+    {
+        get
+        {
+            var result = written;
+
+            if (!string.IsNullOrEmpty(nameFilter))
+            {
+                result = result.Where(w => w.WrittenOutputName.Contains(nameFilter, StringComparison.CurrentCultureIgnoreCase));
+            }
+            return result;
+        }
+    }
+
+
+    PerformanceOutput performanceOutputlist = new();
+    IQueryable<PerformanceOutput> performance = Enumerable.Empty<PerformanceOutput>().AsQueryable();
+    IQueryable<PerformanceOutput> prfOutputlist
+    {
+        get
+        {
+            var result = performance;
+
+            if (!string.IsNullOrEmpty(nameFilter))
+            {
+                result = result.Where(w => w.PerformanceOutputName.Contains(nameFilter, StringComparison.CurrentCultureIgnoreCase));
+            }
+            return result;
+        }
+    }
+
+    PeriodicalOutput periodicalOutputlist = new();
+    IQueryable<PeriodicalOutput> periodical = Enumerable.Empty<PeriodicalOutput>().AsQueryable();
+    IQueryable<PeriodicalOutput> prdOutputlist
+    {
+        get
+        {
+            var result = periodical;
+
+            if (!string.IsNullOrEmpty(nameFilter))
+            {
+                result = result.Where(w => w.PeriodicalOutputName.Contains(nameFilter, StringComparison.CurrentCultureIgnoreCase));
+            }
+            return result;
+        }
+    }
+    WeightedScore scorelist = new();
+    IQueryable<WeightedScore> weighted = Enumerable.Empty<WeightedScore>().AsQueryable();
+
+    private int totalGrade = 0;
+
+    private string wrtOuts;
+    private string wrtTotal;
+    private string wrtAve;
+
+    private string prfOuts;
+    private string prfTotal;
+    private string prfAve;
+
+    private string prdOuts;
+    private string prdTotal;
+    private string prdAve;
+
+    private string displaySingle;
+    private string displayOverAll;
+    private string displayMulti;
+    private string isSummary;
+
+    private string viewSelection;
+    private string outputView;
+    private string btnAddoutput;
+
+    private string displaySummary;
+
+    private int cachedValue;
+
+
+    private int global_ClassID;
+    private int global_UserID;
+    private int _currentQuarter;
+    private int outputID;
+    private int outputType;
+    private int  _schoolYear;
+    private Class _classData;
+
+    public Class ClassData
+    {
+        get { return _classData; }
+        set { _classData = value; }
+    }
+
+    public int SchoolYear
+    {
+        get { return _schoolYear; }
+        set { _schoolYear = value; }
+    }
+
+    public int OutputType
+    {
+        get { return outputType; }
+        set { outputType = value; }
+    }
+
+    public int OutputID
+    {
+        get { return outputID; }
+        set { outputID = value; }
+    }
+
+
+    public int CurrentQuarter
+    {
+        get { return _currentQuarter; }
+        set { _currentQuarter = value; }
+    }
+
+    public int Global_UserID
+    {
+        get { return global_UserID; }
+        set { global_UserID = value; }
+    }
+
+    public int Global_ClassID
+    {
+        get { return global_ClassID; }
+        set { global_ClassID = value; }
+    }
+
+
+    void RetrieveFromCache<T>(string key, Action<T> onSuccess)
+    {
+        if (CacheService.TryGetValue<T>(key, out var data))
+        {
+            onSuccess(data);
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        RetrieveFromCache<User>("User", userData => Global_UserID = userData.UserID);
+        RetrieveFromCache<Class>("Class", classData => Global_ClassID = classData.ClassID);
+        RetrieveFromCache<Class>("Class", classData => SchoolYear = classData.SchoolYearID);
+        RetrieveFromCache<Class>("Class", classData => ClassData = classData);
+        CurrentQuarter = 1;
+        await LoadGradeDistribution();
+
+        await Load(Global_ClassID, false, CurrentQuarter);
+        var quarter = await classrec.GetQuartersAsync();
+        quarterlist = quarter != null ? quarter.Data : null;
+        Quarter summary = new()
+        {
+            QuarterID = 101,
+            QuarterName = "Summary Quarter"
+        };
+        quarterlist.Add(summary);
+        var schoolyearresult = await ResourcesService.GetSchoolYearAsync();
+        schoolYearlist = schoolyearresult.Data != null ? schoolyearresult.Data.AsQueryable() : Enumerable.Empty<SchoolYear>().AsQueryable();
+        recordName = "Written";
+        ChangeView(1);
+        isSingle = true;
+        isMulti = false;
+        isOverall = false;
+
+    }
+    async Task<List<int>> GetListforGraph(int type)
+    {
+        List<int> malelist = new();
+        List<int> femalelist = new();
+        List<int> alllist = new();
+        var data1 = await classrec.GetAllStudentsRecordsAsync(Global_ClassID, CurrentQuarter);
+        var forGraph = data1 != null ? await ComputeGrades(data1, false, CurrentQuarter) : new RecordModel();
+
+        foreach (var item in forGraph.Student)
+        {
+            alllist.Add(item.QuarterlyGrade);
+            if(item.Gender.Equals("M")){ malelist.Add(item.QuarterlyGrade); }
+            if(item.Gender.Equals("F")){ femalelist.Add(item.QuarterlyGrade); }
+        }
+
+        if(type == 1){ return malelist; }
+        else if(type == 2){ return femalelist; }
+        else if(type == 3){ return alllist; }
+        else { return new List<int>(); }
+
+
+    }
+    async Task LoadGradeDistribution()
+    {
+        _config = new BarConfig
+            {
+                Options = new BarOptions
+                {
+                    Responsive = true,
+                    Legend = new Legend
+                    {
+                        Position = Position.Top
+                    },
+                    Title = new OptionsTitle
+                    {
+                        Display = true,
+                        Text = "Summary of Grades"
+                    }
+                }
+            };
+
+        IDataset<int> dataset1 = new BarDataset<int>(await GetMaleCountPerRange(InitalCount))
+            {
+                Label = "Male",
+                BackgroundColor = ChartColors.Blue,
+                BorderColor = ChartColors.Blue,
+                BorderWidth = 1
+            };
+        IDataset<int> dataset2 = new BarDataset<int>(await GetFemaleCountPerRange(InitalCount))
+            {
+                Label = "Female",
+                BackgroundColor = ChartColors.Red,
+                BorderColor = ChartColors.Red,
+                BorderWidth = 1
+            };
+        IDataset<int> dataset3 = new BarDataset<int>(await GetAllCountPerRange(InitalCount))
+            {
+                Label = "Male and Female",
+                BackgroundColor = ChartColors.Purple,
+                BorderColor = ChartColors.Purple,
+                BorderWidth = 1
+            };
+
+        foreach (var month in Months.Take(InitalCount))
+        {
+            _config.Data.Labels.Add(month);
+        }
+        _config.Data.Datasets.Add(dataset1);
+        _config.Data.Datasets.Add(dataset2);
+        _config.Data.Datasets.Add(dataset3);
+
+    }
+
+    async Task LoadDistribution()
+    {
+        var maleCounts = await GetMaleCountPerRange(InitalCount);
+        var femaleCounts = await GetFemaleCountPerRange(InitalCount);
+        var allCounts = await GetAllCountPerRange(InitalCount);
+        var datasets = new List<List<int>> { maleCounts, femaleCounts, allCounts };
+
+        for (int i = 0; i < _config.Data.Datasets.Count; i++)
+        {
+            if (_config.Data.Datasets[i] is BarDataset<int> dataset)
+            {
+                dataset.Clear();
+                foreach (var item in datasets[i])
+                {
+                    dataset.Add(item);
+                }
+            }
+        }
+
+        _chart.Update();
+    }
+
+    async Task<List<int>> GetMaleCountPerRange(int count)
+    {
+        List<int> maleList = new List<int>();
+        var data = await GetListforGraph(1);
+        foreach (var item in Months)
+        {
+            string[] parts = item.Split('-');
+            // Step 2: Convert the bounds to integers
+            int start = int.Parse(parts[0]);
+            int end = int.Parse(parts[1]);
+            int countInRange = data.Count(n => n >= start && n <= end);
+            maleList.Add(countInRange);
+        }
+        return maleList;
+    }
+    async Task<List<int>> GetFemaleCountPerRange(int count)
+    {
+        List<int> femaleList = new List<int>();
+        var data = await GetListforGraph(2);
+        foreach (var item in Months)
+        {
+            string[] parts = item.Split('-');
+            // Step 2: Convert the bounds to integers
+            int start = int.Parse(parts[0]);
+            int end = int.Parse(parts[1]);
+            int countInRange = data.Count(n => n >= start && n <= end);
+            femaleList.Add(countInRange);
+        }
+        return femaleList;
+    }
+    async Task<List<int>> GetAllCountPerRange(int count)
+    {
+        List<int> allList = new List<int>();
+        var data = await GetListforGraph(3);
+        foreach (var item in Months)
+        {
+            string[] parts = item.Split('-');
+            // Step 2: Convert the bounds to integers
+            int start = int.Parse(parts[0]);
+            int end = int.Parse(parts[1]);
+            int countInRange = data.Count(n => n >= start && n <= end);
+            allList.Add(countInRange);
+        }
+        return allList;
+    }
+
+
+    async Task<RecordModel> ComputeGrades(RecordModel record, bool isCompact, int quarterid)
+    {
+        foreach (var item in record.Student)
+        {
+            if (item.WrittenOutput != null)
+            {
+                item.TotalWrittenScore = 0;
+                item.AverageWrittenScore = 0;
+                int totalWRT = 0;
+                double wScore = 0.0;
+                foreach (var keys in item.WrittenOutput)
+                {
+                    item.TotalWrittenScore += keys.Value.WrittenData.Score;
+                    totalWRT += keys.Value.MaxScore;
+                    wScore = keys.Value.WeightedScore;
+                }
+                item.AverageWrittenScore = (((double)item.TotalWrittenScore / totalWRT) * 100 * wScore);
+
+            }
+            if (item.PerformanceOutput != null)
+            {
+                item.TotalPerformanceScore = 0;
+                item.AveragePerformanceScore = 0;
+                int totalPRF = 0;
+                double wScore = 0.0;
+                foreach (var keys in item.PerformanceOutput)
+                {
+                    item.TotalPerformanceScore += keys.Value.PerformanceData.Score;
+                    totalPRF += keys.Value.MaxScore;
+                    wScore = keys.Value.WeightedScore;
+                }
+                item.AveragePerformanceScore = (((double)item.TotalPerformanceScore / totalPRF) * 100 * wScore);
+            }
+            if (item.PeriodicalOutput != null)
+            {
+                item.TotalPeridiocialScore = 0;
+                item.AveragePeriodicalScore = 0;
+                int totalPRD = 0;
+                double wScore = 0.0;
+                foreach (var keys in item.PeriodicalOutput)
+                {
+                    item.TotalPeridiocialScore += keys.Value.PeriodicalData.Score;
+                    totalPRD += keys.Value.MaxScore;
+                    wScore = keys.Value.WeightedScore;
+                }
+
+                item.AveragePeriodicalScore = (((double)item.TotalPeridiocialScore / totalPRD) * 100 * wScore);
+            }
+
+            item.InitialGrade = item.AverageWrittenScore + item.AveragePerformanceScore + item.AveragePeriodicalScore;
+            var grade =  await classrec.GetGradeRulesAsync(item.InitialGrade);
+            item.QuarterlyGrade = grade.Data != 0 ? grade.Data : 0;
+
+        }
+        var sortedStudents = record.Student.OrderByDescending(s => s.QuarterlyGrade).ToList();
+
+        int currentRank = 1;
+        for (int i = 0; i < sortedStudents.Count; i++)
+        {
+            if (i > 0 && sortedStudents[i].QuarterlyGrade == sortedStudents[i - 1].QuarterlyGrade)
+            {
+                sortedStudents[i].Rank = sortedStudents[i - 1].Rank;
+            }
+            else
+            {
+                sortedStudents[i].Rank = currentRank;
+            }
+            currentRank++;
+        }
+
+        // Update the original list with the ranks
+        foreach (var student in record.Student)
+        {
+            var rankedStudent = sortedStudents.First(s => s.StudentId == student.StudentId);
+            student.Rank = rankedStudent.Rank;
+        }
+
+        return record;
+
+    }
+
+
+    async Task Load(int classid, bool isCompact, int quarterid){
+
+        if(quarterid == 101)
+        {
+            var data1 = await classrec.GetAllStudentsRecordsAsync(classid, quarterid);
+            recordModel = data1 != null ? await GetSummary(classid) : null;
+        }
+        else
+        {
+            var data1 = await classrec.GetAllStudentsRecordsAsync(classid, quarterid);
+            recordModel = data1 != null ? await ComputeGrades(data1, isCompact, quarterid) : null;
+        }
+        summaryOuputs = await classrec.GetStudentsClassSummaryAsync(classid, quarterid);
+        var written = await classrec.GetWrittenOutputAsync(classid, quarterid);
+        writtenOutputs = written.Data != null ? written.Data : null;
+        var performance = await classrec.GetPerformanceOutputAsync(classid, quarterid);
+        performanceOutputs = performance.Data != null ? performance.Data : null;
+        var periodical = await classrec.GetPeriodicalOutputAsync(classid, quarterid);
+        periodicalOutputs = periodical.Data != null ? periodical.Data : null;
+
+    }
+
+    async Task Reload()
+    {
+
+        if (isSingle)
+        {
+            ChangeView(1);
+        }
+        else if (isMulti)
+        {
+            ChangeView(2);
+        }
+        else if (isOverall)
+        {
+            ChangeView(3);
+        }
+
+    }
+    void NextRecord()
+    {
+        if (recordName.Equals("Written"))
+        {
+            recordName = "Performance";
+            ChangeView(1);
+        }
+        else if (recordName.Equals("Performance"))
+        {
+            recordName = "Periodical";
+            ChangeView(1);
+        }
+        else if (recordName.Equals("Periodical"))
+        {
+            recordName = "Written";
+            ChangeView(1);
+        }
+    }
+    void PreviousRecord()
+    {
+        if(recordName.Equals("Written"))
+        {
+            recordName = "Periodical";
+            ChangeView(1);
+        }
+        else if (recordName.Equals("Performance"))
+        {
+            recordName = "Written";
+            ChangeView(1);
+        }
+        else if (recordName.Equals("Periodical"))
+        {
+            recordName = "Performance";
+            ChangeView(1);
+        }
+    }
+
+    async Task LoadRecordbyQuarterID(ChangeEventArgs e)
+    {
+
+        int type = int.Parse(e.Value.ToString());
+        CurrentQuarter = type;
+        if (CurrentQuarter == 101)
+        {
+            await Load(Global_ClassID, true, CurrentQuarter);
+            ChangeView(CurrentQuarter);
+            viewSelection = "d-none";
+            outputView = "d-none";
+            btnAddoutput = "d-none";
+            displaySummary = "d-none";
+        }
+        else
+        {
+            await Load(Global_ClassID, false, CurrentQuarter);
+            await LoadDistribution();
+            isSingle = true;
+            await Reload();
+            viewSelection = "";
+            outputView = "";
+            btnAddoutput = "";
+            displaySummary = "";
+        }
+
+    }
+
+    void ChangeView(int type)
+    {
+        if(type == 1)
+        {
+            if (recordName.Equals("Written"))
+            {
+                wrtOuts = "";
+                wrtTotal = "";
+                wrtAve = "";
+
+                prfOuts = "d-none";
+                prfTotal = "d-none";
+                prfAve = "d-none";
+
+                prdOuts = "d-none";
+                prdTotal = "d-none";
+                prdAve = "d-none";
+            }
+            else if (recordName.Equals("Performance"))
+            {
+                wrtOuts = "d-none";
+                wrtTotal = "d-none";
+                wrtAve = "d-none";
+
+                prfOuts = "";
+                prfTotal = "";
+                prfAve = "";
+
+                prdOuts = "d-none";
+                prdTotal = "d-none";
+                prdAve = "d-none";
+            }
+            else if(recordName.Equals("Periodical"))
+            {
+                wrtOuts = "d-none";
+                wrtTotal = "d-none";
+                wrtAve = "d-none";
+
+                prfOuts = "d-none";
+                prfTotal = "d-none";
+                prfAve = "d-none";
+
+                prdOuts = "";
+                prdTotal = "";
+                prdAve = "";
+            }
+            displaySingle = "";
+            displayOverAll = "d-none";
+            displayMulti = "d-none";
+            isSummary = "d-none";
+            isSingle = true;
+            isMulti = false;
+            isOverall = false;
+
+        }
+        if(type == 2)
+        {
+            wrtOuts = "";
+            wrtTotal = "";
+            wrtAve = "";
+
+            prfOuts = "";
+            prfTotal = "";
+            prfAve = "";
+
+            prdOuts = "";
+            prdTotal = "";
+            prdAve = "";
+
+            displaySingle = "d-none";
+            displayOverAll = "d-none";
+            displayMulti = "";
+            isSingle = false;
+            isMulti = true;
+            isOverall = false;
+            isSummary = "d-none";
+        }
+        if (type == 3)
+        {
+            wrtOuts = "d-none";
+            wrtTotal = "";
+            wrtAve = "";
+
+            prfOuts = "d-none";
+            prfTotal = "";
+            prfAve = "";
+
+            prdOuts = "d-none";
+            prdTotal = "";
+            prdAve = "";
+
+            displaySingle = "d-none";
+            displayOverAll = "";
+            displayMulti = "d-none";
+            isSingle = false;
+            isMulti = false;
+            isOverall = true;
+            isSummary = "d-none";
+        }
+        if (type == 101)
+        {
+            wrtOuts = "d-none";
+            wrtTotal = "d-none";
+            wrtAve = "d-none";
+
+            prfOuts = "d-none";
+            prfTotal = "d-none";
+            prfAve = "d-none";
+
+            prdOuts = "d-none";
+            prdTotal = "d-none";
+            prdAve = "d-none";
+
+            displaySingle = "d-none";
+            displayOverAll = "d-none";
+            displayMulti = "d-none";
+            isSingle = false;
+            isMulti = false;
+            isOverall = false;
+            isSummary = "";
+        }
+    }
+
+    async Task AddUpdWRTRecord(ChangeEventArgs e, RecordWrittenData data)
+    {
+        data.Score = int.Parse(e.Value.ToString());
+        var newdata = new WrittenData()
+            {
+                WrittenOutputID = data.WrittenOutputId,
+                WrittenDataID = data.WrittenDataId,
+                StudentID = data.StudentId,
+                Score = data.Score
+            };
+        var result = await classrec.WrittenDataAddUpdateAsync(newdata, Global_UserID);
+        await Load(Global_ClassID, false, CurrentQuarter);
+        await Reload();
+
+    }
+    async Task AddUpdPRFRecord(ChangeEventArgs e, RecordPerformanceData data)
+    {
+        data.Score = int.Parse(e.Value.ToString());
+        var newdata = new PerformanceData()
+            {
+                PerformanceOutputID = data.PerformanceOutputId,
+                PerformanceDataID = data.PerformanceDataId,
+                StudentID = data.StudentId,
+                Score = data.Score
+            };
+        var result = await classrec.PerformanceDataAddUpdateAsync(newdata, Global_UserID);
+        await Load(Global_ClassID, false, CurrentQuarter);
+        await Reload();
+    }
+    async Task AddUpdPRDRecord(ChangeEventArgs e, RecordPeriodicalData data)
+    {
+        data.Score = int.Parse(e.Value.ToString());
+        var newdata = new PeriodicalData()
+            {
+                PeriodicalOutputID = data.PeriodicalOutputId,
+                PeriodicalDataID = data.PeriodicalDataId,
+                StudentID = data.StudentId,
+                Score = data.Score
+            };
+        var result = await classrec.PeriodicalDataAddUpdateAsync(newdata, Global_UserID);
+        await Load(Global_ClassID, false, CurrentQuarter);
+        await Reload();
+    }
+
+    async Task<RecordModel> GetSummary(int classid)
+    {
+        var qtr = await classrec.GetQuarterSummary(classid);
+        foreach (var item in qtr.Student)
+        {
+            double qrtrGrade = 0;
+            foreach(var data in item.Quarters)
+            {
+                item.TotalWrittenScore = 0;
+                item.AverageWrittenScore = 0;
+
+                item.TotalPerformanceScore = 0;
+                item.AveragePerformanceScore = 0;
+
+                item.TotalPeridiocialScore = 0;
+                item.AveragePeriodicalScore = 0;
+
+                if (data.Value.WrittenOutput != null && data.Value.WrittenOutput.Count != 0)
+                {
+                    int totalWRT = 0;
+                    double wScore = 0.0;
+                    foreach (var keys in data.Value.WrittenOutput)
+                    {
+
+                        item.TotalWrittenScore += keys.Value.WrittenData.Score;
+                        totalWRT += keys.Value.MaxScore;
+                        wScore = keys.Value.WeightedScore;
+                    }
+                    item.AverageWrittenScore = (((double)item.TotalWrittenScore / totalWRT) * 100 * wScore);
+
+                }
+                if (data.Value.PerformanceOutput != null && data.Value.PerformanceOutput.Count != 0)
+                {
+                    int totalPRF = 0;
+                    double wScore = 0.0;
+                    foreach (var keys in data.Value.PerformanceOutput)
+                    {
+                        item.TotalPerformanceScore += keys.Value.PerformanceData.Score;
+                        totalPRF += keys.Value.MaxScore;
+                        wScore = keys.Value.WeightedScore;
+                    }
+                    item.AveragePerformanceScore = (((double)item.TotalPerformanceScore / totalPRF) * 100 * wScore);
+                }
+                if (data.Value.PeriodicalOutput != null && data.Value.PeriodicalOutput.Count != 0)
+                {
+
+                    int totalPRD = 0;
+                    double wScore = 0.0;
+                    foreach (var keys in data.Value.PeriodicalOutput)
+                    {
+                        item.TotalPeridiocialScore += keys.Value.PeriodicalData.Score;
+                        totalPRD += keys.Value.MaxScore;
+                        wScore = keys.Value.WeightedScore;
+                    } 
+
+                    item.AveragePeriodicalScore = (((double)item.TotalPeridiocialScore / totalPRD) * 100 * wScore);
+                }
+
+
+                item.InitialGrade = item.AverageWrittenScore + item.AveragePerformanceScore + item.AveragePeriodicalScore;
+                var grade = await classrec.GetGradeRulesAsync(item.InitialGrade);
+                data.Value.Grade = grade.Data != 0 ? grade.Data : 0;
+                qrtrGrade += data.Value.Grade;
+            }
+            double fgrade = Math.Round((qrtrGrade / 4), 2);
+            item.FinalGrade = (int)Math.Round(fgrade);
+            item.GradeRemarks = item.FinalGrade <= 74 ? "FAILED" : "PASSED";
+
+        }
+        return qtr;
+    }
+
+    async Task AddWrittenOutput(WrittenOutput output)
+    {
+        output.ClassID = Global_ClassID;
+        var result =  await classrec.AddWrittenOutputAsync(output, Global_UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await Load(Global_ClassID, false, CurrentQuarter);
+        await Reload();
+    }
+    async Task AddPerformanceOutput(PerformanceOutput output)
+    {
+        output.ClassID = Global_ClassID;
+        var result = await classrec.AddPerformanceOutputAsync(output, Global_UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await Load(Global_ClassID, false, CurrentQuarter);
+        await Reload();
+    }
+    async Task AddPeriodicalOutput(PeriodicalOutput output)
+    {
+        output.ClassID = Global_ClassID;
+        var result = await classrec.AddPeriodicalOutputAsync(output, Global_UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await Load(Global_ClassID, false, CurrentQuarter);
+        await Reload();
+    }
+
+    async Task AddWeightedScore(WeightedScore score)
+    {
+        score.ClassID = ClassData.ClassID;
+        score.SchoolYearID = ClassData.SchoolYearID;
+        score.QuarterID = CurrentQuarter;
+        var result = await ResourcesService.AddWeightedAsync(score);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+    }
+
+    async Task UpdateWrittenOutput(WrittenOutput output)
+    {
+        var result = await classrec.UpdateWrittenOutputAsync(output, Global_UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+    }
+    async Task UpdatePerformanceOutput(PerformanceOutput output)
+    {
+        var result = await classrec.UpdatePerformanceOutputAsync(output, Global_UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+    }
+    async Task UpdatePeriodicalOutput(PeriodicalOutput output)
+    {
+        var result = await classrec.UpdatePeriodicalOutputAsync(output, Global_UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+    }
+
+    async Task UpdateWeightedScore(WeightedScore output)
+    {
+        var result = await ResourcesService.UpdateWeightedAsync(output);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+    }
+
+
+    async Task LoadDatas(int type)
+    {
+
+        if(CurrentQuarter != 101)
+        {
+            if(type != 0){
+                if(type == 1)
+                {
+                    var result = await classrec.GetWrittenOutputAsync(Global_ClassID, CurrentQuarter);
+                    written = result.Data != null ? result.Data.AsQueryable() : Enumerable.Empty<WrittenOutput>().AsQueryable();
+                    writtenOutputlist = new WrittenOutput();
+
+                }
+                else if(type == 2)
+                {
+                    var result = await classrec.GetPerformanceOutputAsync(Global_ClassID, CurrentQuarter);
+                    performance = result.Data != null ? result.Data.AsQueryable() : Enumerable.Empty<PerformanceOutput>().AsQueryable();
+                    performanceOutputlist = new PerformanceOutput();
+                }
+                else if (type == 3)
+                {
+                    var result = await classrec.GetPeriodicalOutputAsync(Global_ClassID, CurrentQuarter);
+                    periodical = result.Data != null ? result.Data.AsQueryable() : Enumerable.Empty<PeriodicalOutput>().AsQueryable();
+                    periodicalOutputlist = new PeriodicalOutput();
+                }
+            }else{
+                var quarter = await classrec.GetQuartersAsync();
+                quarteradd = quarter.Data;
+                var outs = await ResourcesService.GetOutputsAsync();
+                outputlist = outs.Data;
+                scorelist = new WeightedScore();
+                writtenOutputlist = new WrittenOutput();
+                performanceOutputlist = new PerformanceOutput();
+                periodicalOutputlist = new PeriodicalOutput();
+
+            }
+        }
+    }
+
+    async Task LoadScores()
+    {
+        var result = await ResourcesService.GetWeightedScoreAsync(Global_ClassID, SchoolYear);
+        weighted = result.Data != null ? result.Data.AsQueryable() : null;
+        scorelist = new WeightedScore();
+    }
+
+    async Task LoadWrittenOutput(WrittenOutput output)
+    {
+        await LoadDatas(0);
+        if(written != null)
+        {
+            var result = written.FirstOrDefault(w => w.WrittenOutputID == output.WrittenOutputID);
+            writtenOutputlist = result;
+        }
+    }
+    async Task LoadScoresOutput(WeightedScore score)
+    {
+        await LoadDatas(0);
+        scorelist = weighted.FirstOrDefault(w => w.WeightedScoreID == score.WeightedScoreID);
+    }
+    async Task LoadPerformanceOutput(PerformanceOutput output)
+    {
+        await LoadDatas(0);
+        if(performance != null)
+        {
+            var result = performance.FirstOrDefault(p => p.PerformanceOutputID == output.PerformanceOutputID);
+            performanceOutputlist = result;
+        }
+
+    }
+    async Task LoadPeriodicalOutput(PeriodicalOutput output)
+    {
+        await LoadDatas(0);
+        if(periodical != null)
+        {
+            var result = periodical.FirstOrDefault(p => p.PeriodicalOutputID == output.PeriodicalOutputID);
+            periodicalOutputlist = result;
+        }
+
+
+    }
+
+    async Task DeleteWrittenOutput(int output)
+    {
+        var result = await classrec.DeleteWrittenOutputAsync(output, Global_UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+    }
+    async Task DeletePerformanceOutput(int output)
+    {
+        var result = await classrec.DeletePerformanceOutputAsync(output, Global_UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+    }
+    async Task DeletePeriodicalOutput(int output)
+    {
+        var result = await classrec.DeletePeriodicalOutputAsync(output, Global_UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+    }
+    async Task DeleteWeightedScore(int scoreid)
+    {
+        var result = await ResourcesService.DeleteWeightedAsync(scoreid, Global_UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+    }
+
+    void SetDataforDelete(int outputid, int outputtype)
+    {
+        OutputID = outputid;
+        OutputType = outputtype;
+    }
+
+    async Task DeleteConfirm()
+    {
+
+
+        if(OutputType == 1){
+            await DeleteWrittenOutput(OutputID);
+        }
+        else if(OutputType == 2){
+            await DeletePerformanceOutput(OutputID);
+        }
+        else if (OutputType == 3)
+        {
+            await DeletePeriodicalOutput(OutputID);
+        }
+        else if (OutputType == 4)
+        {
+            await DeleteWeightedScore(OutputID);
+        }
+        DeleteReset();
+    }
+
+    void DeleteReset()
+    {
+        OutputID = 0;
+        OutputType = 0;
+    }
+
+    private string hoverText = string.Empty;
+
+    private void OnMouseOver(string writtenOutputName)
+    {
+        hoverText = writtenOutputName;
+    }
+
+    private void OnMouseOut()
+    {
+        hoverText = string.Empty;
+    }
+
+
+    async Task<RecordModel> GetSummary2(List<Class> classdata)
+    {
+        var studentRecords = new RecordModel();
+        foreach (var row in classdata)
+        {
+            studentRecords = await classrec.GetQuarterSummary(row.ClassID);
+            foreach (var item in studentRecords.Student)
+            {
+                int qrtrGrade = 0;
+                var subjectFinalgradesDict = new Dictionary<string, Subjects>();
+                var subjectDatas = new Subjects()
+                    {
+                        SubjectID = row.SubjectID,
+                        SubjectName = row.SubjectName,
+                        Quarters = new Dictionary<string, RecordQuarters>()
+                    };
+                foreach (var data in item.Quarters)
+                {
+                    item.TotalWrittenScore = 0;
+                    item.AverageWrittenScore = 0;
+
+                    item.TotalPerformanceScore = 0;
+                    item.AveragePerformanceScore = 0;
+
+                    item.TotalPeridiocialScore = 0;
+                    item.AveragePeriodicalScore = 0;
+
+
+
+                    var recordDict = new Dictionary<string, RecordQuarters>();
+                    if (data.Value.WrittenOutput != null && data.Value.WrittenOutput.Count != 0)
+                    {
+                        int totalWRT = 0;
+                        double wScore = 0.0;
+                        foreach (var keys in data.Value.WrittenOutput)
+                        {
+                            item.TotalWrittenScore += keys.Value.WrittenData.Score;
+                            totalWRT += keys.Value.MaxScore;
+                            wScore = keys.Value.WeightedScore;
+                        }
+                        item.AverageWrittenScore = (((double)item.TotalWrittenScore / totalWRT) * 100 * wScore);
+
+                    }
+                    if (data.Value.PerformanceOutput != null && data.Value.PerformanceOutput.Count != 0)
+                    {
+                        int totalPRF = 0;
+                        double wScore = 0.0;
+                        foreach (var keys in data.Value.PerformanceOutput)
+                        {
+                            item.TotalPerformanceScore += keys.Value.PerformanceData.Score;
+                            totalPRF += keys.Value.MaxScore;
+                            wScore = keys.Value.WeightedScore;
+                        }
+                        item.AveragePerformanceScore = (((double)item.TotalPerformanceScore / totalPRF) * 100 * wScore);
+                    }
+                    if (data.Value.PeriodicalOutput != null && data.Value.PeriodicalOutput.Count != 0)
+                    {
+
+                        int totalPRD = 0;
+                        double wScore = 0.0;
+                        foreach (var keys in data.Value.PeriodicalOutput)
+                        {
+                            item.TotalPeridiocialScore += keys.Value.PeriodicalData.Score;
+                            totalPRD += keys.Value.MaxScore;
+                            wScore = keys.Value.WeightedScore;
+                        }
+
+                        item.AveragePeriodicalScore = (((double)item.TotalPeridiocialScore / totalPRD) * 100 * wScore);
+                    }
+
+
+                    item.InitialGrade = item.AverageWrittenScore + item.AveragePerformanceScore + item.AveragePeriodicalScore;
+                    var grade = await classrec.GetGradeRulesAsync(item.InitialGrade);
+                    data.Value.Grade = grade.Data != 0 ? grade.Data : 0;
+                    qrtrGrade += data.Value.Grade;
+                    subjectDatas.Quarters = item.Quarters;
+                }
+                subjectFinalgradesDict.Add(row.SubjectName, subjectDatas);
+                item.FinalGrade = qrtrGrade / 4;
+                item.GradeRemarks = item.FinalGrade <= 74 ? "FAILED" : "PASSED";
+                item.Subject = subjectFinalgradesDict;
+            }
+        }
+        return studentRecords;
+    }
+
+
+    private bool IsAnyRequiredFieldEmpty(int outputType)
+    {
+        if(outputType == 1)
+        {
+            // Define the required fields for the user model
+            var requiredFields = new[] { "WrittenOutputName", "QuarterName", "MaxScore" };
+
+            // Check if any of the required fields are null, empty, or whitespace
+            return requiredFields.Any(field =>
+            string.IsNullOrWhiteSpace(writtenOutputlist.GetType().GetProperty(field)?.GetValue(writtenOutputlist)?.ToString()) ||
+            (field == "WrittenOutputName" && string.IsNullOrWhiteSpace(writtenOutputlist.WrittenOutputName)) ||
+            (field == "QuarterName" && string.IsNullOrWhiteSpace(writtenOutputlist.QuarterName)) ||
+            (field == "MaxScore" && writtenOutputlist.MaxScore == 0));
+        }
+        else if(outputType == 2)
+        {
+            // Define the required fields for the user model
+            var requiredFields = new[] { "PerformanceOutputName", "QuarterName", "MaxScore" };
+
+            // Check if any of the required fields are null, empty, or whitespace
+            return requiredFields.Any(field =>
+            string.IsNullOrWhiteSpace(performanceOutputlist.GetType().GetProperty(field)?.GetValue(performanceOutputlist)?.ToString()) ||
+            (field == "PerformanceOutputName" && string.IsNullOrWhiteSpace(performanceOutputlist.PerformanceOutputName)) ||
+            (field == "QuarterName" && string.IsNullOrWhiteSpace(performanceOutputlist.QuarterName)) ||
+            (field == "MaxScore" && performanceOutputlist.MaxScore == 0));
+        }
+         else if(outputType == 3)
+        {
+            // Define the required fields for the user model
+            var requiredFields = new[] { "PeriodicalOutputName", "QuarterName", "MaxScore" };
+
+            // Check if any of the required fields are null, empty, or whitespace
+            return requiredFields.Any(field =>
+            string.IsNullOrWhiteSpace(periodicalOutputlist.GetType().GetProperty(field)?.GetValue(periodicalOutputlist)?.ToString()) ||
+            (field == "PeriodicalOutputName" && string.IsNullOrWhiteSpace(periodicalOutputlist.PeriodicalOutputName)) ||
+            (field == "QuarterName" && string.IsNullOrWhiteSpace(periodicalOutputlist.QuarterName)) ||
+            (field == "MaxScore" && periodicalOutputlist.MaxScore == 0));
+        }
+         else if(outputType == 4)
+        {
+            // Define the required fields for the user model
+            var requiredFields = new[] { "OutputID", "Score" };
+
+            // Check if any of the required fields are null, empty, or whitespace
+            return requiredFields.Any(field =>
+            string.IsNullOrWhiteSpace(scorelist.GetType().GetProperty(field)?.GetValue(scorelist)?.ToString()) ||
+            (field == "OutputID" && scorelist.OutputID == 0) ||
+            (field == "Score" && scorelist.Score <= 0));
+        }
+         else if(outputType == 5)
+        {
+            // Define the required fields for the user model
+            var requiredFields = new[] { "OutputID", "Score" };
+
+            // Check if any of the required fields are null, empty, or whitespace
+            return requiredFields.Any(field =>
+            string.IsNullOrWhiteSpace(scorelist.GetType().GetProperty(field)?.GetValue(scorelist)?.ToString()) ||
+            (field == "OutputID" && scorelist.OutputID == 0) ||
+            (field == "SchoolYearID" && scorelist.SchoolYearID == 0) ||
+            (field == "Score" && scorelist.Score <= 0));
+        }
+         if(outputType == 6)
+        {
+            // Define the required fields for the user model
+            var requiredFields = new[] { "WrittenOutputName", "QuarterID", "MaxScore" };
+
+            // Check if any of the required fields are null, empty, or whitespace
+            return requiredFields.Any(field =>
+            string.IsNullOrWhiteSpace(writtenOutputlist.GetType().GetProperty(field)?.GetValue(writtenOutputlist)?.ToString()) ||
+            (field == "WrittenOutputName" && string.IsNullOrWhiteSpace(writtenOutputlist.WrittenOutputName)) ||
+            (field == "QuarterID" && writtenOutputlist.QuarterID == 0) ||
+            (field == "MaxScore" && writtenOutputlist.MaxScore == 0));
+        }
+         if(outputType == 7)
+        {
+            // Define the required fields for the user model
+            var requiredFields = new[] { "PerformanceOutputName", "QuarterID", "MaxScore" };
+
+            // Check if any of the required fields are null, empty, or whitespace
+            return requiredFields.Any(field =>
+            string.IsNullOrWhiteSpace(performanceOutputlist.GetType().GetProperty(field)?.GetValue(performanceOutputlist)?.ToString()) ||
+            (field == "PerformanceOutputName" && string.IsNullOrWhiteSpace(performanceOutputlist.PerformanceOutputName)) ||
+            (field == "QuarterID" && performanceOutputlist.QuarterID == 0) ||
+            (field == "MaxScore" && performanceOutputlist.MaxScore == 0));
+        }
+         if(outputType == 8)
+        {
+            // Define the required fields for the user model
+            var requiredFields = new[] { "PeriodicalOutputName", "QuarterID", "MaxScore" };
+
+            // Check if any of the required fields are null, empty, or whitespace
+            return requiredFields.Any(field =>
+            string.IsNullOrWhiteSpace(periodicalOutputlist.GetType().GetProperty(field)?.GetValue(periodicalOutputlist)?.ToString()) ||
+            (field == "PeriodicalOutputName" && string.IsNullOrWhiteSpace(periodicalOutputlist.PeriodicalOutputName)) ||
+            (field == "QuarterID" && periodicalOutputlist.QuarterID == 0) ||
+            (field == "MaxScore" && periodicalOutputlist.MaxScore == 0));
+        }
+        else
+        {
+            return false;
+        }
+    }
+}

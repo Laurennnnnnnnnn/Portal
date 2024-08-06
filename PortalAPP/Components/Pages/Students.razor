@@ -1,0 +1,734 @@
+﻿@page "/students"
+@using ApplicationLayer.Services
+@using DomainLayer.Entities
+@using NetcodeHub.Packages.Components.Validations.OnInput
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using System.Linq
+@using Blazored.Toast.Services
+@using System.Text.RegularExpressions
+@inject IStudentService stu
+@inject IToastService toastService
+@inject ICacheService CacheService
+@inject IResourcesService ResourcesService
+@inject IClassService ClassService
+@inject IJSRuntime JSRuntime
+
+<div class="h-100">
+    <div class="row" style="height: 8%;">
+        <div class="row h-auto">
+            <div class="col"></div>
+            <div class="col"></div>
+            <div class="col d-flex justify-content-center align-items-center">
+                <div class="w-50"></div>
+                <div class="w-50">
+                    <button class="btn btn-primary m-auto text-end float-end @(FilteredStudents.Count() != 0 ? "d-none" : "")" data-bs-target="#importstudents" data-bs-toggle="modal" @onclick="() => ImportFromClass()">
+                        IMPORT STUDENT
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-2 shadow" style="height: 87%;">
+        <div class="container h-100">
+            <div class="row h-100">
+                <div class="col h-100 px-0">
+                    @if(FilteredStudents.Count() == 0){
+                        <img src="/images/no_data.jpg" class="d-block my-0 mx-auto mw-100 mh-100 h-100" />
+                    }
+                    else{
+                        <div class="mh-100 overflow-auto h-100 shadow">
+                        <QuickGrid Class="table table-hover table-responsive" Items="@FilteredStudents" Pagination="state" Theme="corporate">
+                            <PropertyColumn Property="students => (students.Lastname +','+' '+ students.Firstname +' ' + students.Middlename)" Title="Name" Class="student-namefilter align-items-center" Sortable="true">
+                                <ColumnOptions>
+                                    <div class="search-box">
+                                        <input type="search" autofocus @bind="nameFilter" @bind:event="oninput" placeholder="Student name..." />
+                                    </div>
+                                </ColumnOptions>
+                            </PropertyColumn>
+                            <PropertyColumn Property="studlist => studlist.LRN" Title="LRN" Sortable="true" />
+                            <PropertyColumn Property="studlist => studlist.Remarks" Title="Contact" Sortable="true" />
+                            <TemplateColumn Context="studlist" Title="Actions" Class="d-flex flex-row flex-nowrap">
+                                <button class="btn bg-success text-white" @onclick="() => ViewStudent(studlist)" data-bs-target="#studentdetails" data-bs-toggle="modal">Edit</button>
+                                <button class="btn bg-danger text-white ms-1" @onclick="() => DeleteFromClass(studlist)" data-bs-target="#confirmationmodal" data-bs-toggle="modal">Delete</button>
+                            </TemplateColumn>
+
+                        </QuickGrid>
+                        <div class="h-auto position-sticky bottom-0 paginator">
+                            <div class="ms-3">
+                                <Paginator State="state"></Paginator>
+                            </div>
+                        </div>
+                    </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row" style="height: 5%;">
+        <div class="row h-auto">
+            
+        </div>
+    </div>
+</div>
+
+
+
+
+<div class="modal fade" id="studentsearch" aria-hidden="true" aria-labelledby="studentsearchLabel" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="studentsearchLabel">Search Student</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body h-100">
+                <div class="container text-center ">
+                    <div class="row">
+                            <div class="col m-auto">
+                            <input type="text" class="form-control" placeholder="Lastname" @bind="lastName" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                            </div>
+                            <div class="col m-auto">
+                            <input type="text" class="form-control" @bind="firstName" placeholder="Firstname" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                            </div>
+                            <div class="col m-auto">
+                                <button type="button" class="btn btn-primary" @onclick="() => SearchStudent()">Search</button>
+                            <button type="button" class="btn btn-primary" data-bs-target="#studentadd" data-bs-toggle="modal" @onclick="() => selectedStudent = new Student()">New Student</button>
+                            </div>
+                    </div>
+                </div>
+
+                
+                <div class="mh-100 overflow-auto h-100 mt-1">
+                    <QuickGrid Class="table table-hover table-responsive" Items="@StudentList" Theme="corporate">
+                        <PropertyColumn Property="students => (students.Lastname +','+' '+ students.Firstname +' ' + students.Middlename)" Title="Name" Class="student-namefilter align-items-center" Sortable="true"/>
+                        <PropertyColumn Property="studlist => studlist.LRN" Title="LRN" Sortable="true" />
+                        <PropertyColumn Property="studlist => studlist.Birthdate" Title="Birthdate" Sortable="true" />
+                        <TemplateColumn Context="studlist" Title="Actions" Class="justify-content-evenly border-0">
+                            <button class="btn text-info " data-bs-target="#studentdetails" data-bs-toggle="modal" @onclick="() => GetSelectedStudent(studlist)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-eye-fill" viewBox="0 0 16 16">
+                                    <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0" />
+                                    <path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8m8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7" />
+                                </svg>
+                            </button>
+                            <button class="btn text-success" @onclick="() => AddStudentToClass(studlist)" data-bs-dismiss="modal">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-person-plus-fill" viewBox="0 0 16 16">
+                                    <path d="M1 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6" />
+                                    <path fill-rule="evenodd" d="M13.5 5a.5.5 0 0 1 .5.5V7h1.5a.5.5 0 0 1 0 1H14v1.5a.5.5 0 0 1-1 0V8h-1.5a.5.5 0 0 1 0-1H13V5.5a.5.5 0 0 1 .5-.5" />
+                                </svg>
+                            </button>
+                        </TemplateColumn>
+                    </QuickGrid>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="studentdetails" aria-hidden="true" aria-labelledby="studentdetailsLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="studentdetailsLabel2">Student Details</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if(selectedStudent == null)
+                {
+                    <p>Loading...</p>
+                }
+                else
+                {
+                    <EditForm Model="selectedStudent">
+                        <DataAnnotationsValidator />
+                        <div class="container text-center">
+                            <div class="row w-100">
+                                <div class="w-25 rounded-1">
+                                    <div class="m-auto top-0 ">
+                                        <img src="/images/portal_logo.png" width="150" height="150" />
+                                    </div>
+                                </div>
+                                <div class="w-75">
+                                    <div class="container text-center">
+                                        <div class="row m-2">
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="lastnamevalue" @bind="selectedStudent.Lastname" placeholder="Lastname" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                                    <label for="lastnamevalue">Lastname</label>
+                                                </form>
+                                            </div>
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="firstnamevalue" @bind="selectedStudent.Firstname" placeholder="Firstname" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                                    <label for="firstnamevalue">Firstname</label>
+                                                </form>
+                                            </div>
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="middlenamevalue" @bind="selectedStudent.Middlename" placeholder="Middlename" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                                    <label for="middlenamevalue">Middlename</label>
+                                                </form>
+                                            </div>
+                                        </div> 
+                                        <div class="row m-2">
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="birthdatevalue" maxlength="10" @bind="selectedStudent.Birthdate" placeholder="Birthdate" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !(event.charCode >= 48 && event.charCode <= 57) && event.charCode != 47) { event.preventDefault(); }">
+                                                    <label class="text-nowrap" for="birthdatevalue">Birthdate <small>(e.g. @(DateTime.Today.ToString("MM/dd/yyyy")))</small> </label>
+                                                </form>
+                                            </div>
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="gendervalue" @bind="selectedStudent.Gender" placeholder="Gender" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                                    <label for="gendervalue">Gender</label>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        <div class="row m-2">
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="lrnvalue" @bind="selectedStudent.LRN" placeholder="LRN" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122) || (event.charCode >= 48 && event.charCode <= 57))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                                    <label for="lrnvalue">LRN</label>
+                                                </form>
+                                            </div>
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="contactvalue" placeholder="Contact" maxlength="11" onkeypress="if(event.charCode < 48 || event.charCode > 57) event.preventDefault();"
+                                                           oninput="this.value = this.value.toUpperCase();">
+                                                    <label for="contactvalue">Contact</label>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        <div class="row m-2">
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="remarksvalue" placeholder="Remarks" oninput="this.value = this.value.toUpperCase();" >
+                                                    <label for="remarksvalue">Remarks</label>
+                                                </form>
+                                            </div>
+                                            
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </EditForm>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary @(isStudentinClass ?"d-none": "")" data-bs-dismiss="modal" @onclick="() => AddStudentToClass(selectedStudent)" disabled="@IsAnyRequiredFieldEmpty()">Add to Class</button>
+                <button class="btn btn-primary" data-bs-dismiss="modal" @onclick="() => UpdateStudent(selectedStudent)" disabled="@IsAnyRequiredFieldEmpty()">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="studentadd" aria-hidden="true" aria-labelledby="studentaddLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="studentaddLabel2">Student Details</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if (selectedStudent == null)
+                {
+                    <p>Loading...</p>
+                }
+                else
+                {
+                    <EditForm Model="selectedStudent">
+                        <DataAnnotationsValidator />
+                        <div class="container text-center">
+                            <div class="row w-100">
+                                <div class="w-25 rounded-1">
+                                    <div class="m-auto top-0 ">
+                                        <img src="/images/portal_logo.png" width="150" height="150" />
+                                    </div>
+                                </div>
+                                <div class="w-75">
+                                    <div class="container text-center">
+                                        <div class="row m-2">
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="lastnamevalue" @bind="selectedStudent.Lastname" placeholder="Lastname" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                                    <label for="lastnamevalue">Lastname</label>
+                                                </form>
+                                            </div>
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="firstnamevalue" @bind="selectedStudent.Firstname" placeholder="Firstname" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                                    <label for="firstnamevalue">Firstname</label>
+                                                </form>
+                                            </div>
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="middlenamevalue" @bind="selectedStudent.Middlename" placeholder="Middlename" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                                    <label for="middlenamevalue">Middlename</label>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        <div class="row m-2">
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="birthdatevalue" maxlength="10" @bind="selectedStudent.Birthdate" placeholder="Birthdate" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !(event.charCode >= 48 && event.charCode <= 57) && event.charCode != 47) { event.preventDefault(); }">
+                                                    <label class="text-nowrap" for="birthdatevalue">Birthdate <small>(e.g. @(DateTime.Today.ToString("MM/dd/yyyy")))</small> </label>
+                                                </form>
+                                            </div>
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="gendervalue" @bind="selectedStudent.Gender" placeholder="Gender" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                                    <label for="gendervalue">Gender</label>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        <div class="row m-2">
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="lrnvalue" @bind="selectedStudent.LRN" placeholder="LRN" onkeypress="if(event.charCode != 8 && event.charCode != 0 && !((event.charCode >= 65 && event.charCode <= 90) || (event.charCode >= 97 && event.charCode <= 122) || (event.charCode >= 48 && event.charCode <= 57))) { event.preventDefault(); }" oninput="this.value = this.value.toUpperCase();">
+                                                    <label for="lrnvalue">LRN</label>
+                                                </form>
+                                            </div>
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="contactvalue" placeholder="Contact" maxlength="11" onkeypress="if(event.charCode < 48 || event.charCode > 57) event.preventDefault();"
+                                                           oninput="this.value = this.value.toUpperCase();">
+                                                    <label for="contactvalue">Contact</label>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        <div class="row m-2">
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="remarksvalue" placeholder="Remarks" oninput="this.value = this.value.toUpperCase();">
+                                                    <label for="remarksvalue">Remarks</label>
+                                                </form>
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </EditForm>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" @onclick="() => AddNewStudent(selectedStudent)" disabled="@IsAnyRequiredFieldEmpty()">Save</button>
+                <button class="btn btn-primary" data-bs-dismiss="modal" @onclick="() => AddStudentAfterAddClass(selectedStudent)" disabled="@IsAnyRequiredFieldEmpty()">Save and Add to Class</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="importstudents" aria-hidden="true" aria-labelledby="importstudentsLabel" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="importstudentsLabel">Import Class</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body h-100">
+                <div>
+                    <div class="mb-2 text-end">
+                        <div class="row">
+                            <div class="col m-auto w-auto">
+                                @if (schoolYearlist != null)
+                                {
+                                    <select class="form-control w-auto" id="schyear" @onchange="(e) => LoadClass(e)">
+                                        <option selected hidden>Please select SchoolYear</option>
+                                        @foreach (var item in schoolYearlist)
+                                        {
+                                            <option value="@item.SchoolYearID">@item.SchoolYearName</option>
+                                        }
+                                    </select>
+
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="overflow-auto h-75">
+                        <QuickGrid Class="table table-hover table-responsive students-table" Items="@classlist" Theme="corporate">
+                            <PropertyColumn Property="cdata => cdata.SubjectName" Title="Name" Class="student-namefilter align-items-center" Sortable="true" />
+                            <PropertyColumn Property="cdata => cdata.ClassName" Title="Class" Sortable="true" />
+                            <PropertyColumn Property="cdata => cdata.GradeName" Title="Grade" Sortable="true" />
+                            <PropertyColumn Property="cdata => cdata.Teacher" Title="Adviser" Sortable="true" />
+                            <PropertyColumn Property="cdata => cdata.SectionName" Title="Section" Sortable="true" />
+                            <TemplateColumn Context="cdata" Title="Actions" Class="justify-content-evenly border-0">
+                                <button class="btn text-info" data-bs-dismiss="modal" @onclick="() => ImportStudent(cdata)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-person-plus-fill" viewBox="0 0 16 16">
+                                    <path d="M1 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6" />
+                                    <path fill-rule="evenodd" d="M13.5 5a.5.5 0 0 1 .5.5V7h1.5a.5.5 0 0 1 0 1H14v1.5a.5.5 0 0 1-1 0V8h-1.5a.5.5 0 0 1 0-1H13V5.5a.5.5 0 0 1 .5-.5" />
+                                </svg>
+                                </button>
+                            </TemplateColumn>
+                        </QuickGrid>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" tabindex="-1" id="confirmationmodal" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Record Confirmation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" @onclick="() => DeleteReset()"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the record?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" @onclick="() => DeleteReset()">Cancel</button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" @onclick="() => DeleteConfirm()">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="position-fixed btnadd">
+    <button class="btn btn-primary btn-studentadd" data-bs-target="#studentsearch" data-bs-toggle="modal" @onclick="() => ResetList()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-person-fill-add" viewBox="0 0 16 16">
+            <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0" />
+            <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4" />
+        </svg>
+    </button>
+</div>
+
+
+@code {
+    Regex pattern = new Regex("[^0-9]");
+    Student student = new();
+    List<Student> studentlist = new();
+    IQueryable<Student> studlist = Enumerable.Empty<Student>().AsQueryable();
+    IQueryable<Student> allstudent = Enumerable.Empty<Student>().AsQueryable(); 
+    IQueryable<SchoolYear> schoolYearlist = Enumerable.Empty<SchoolYear>().AsQueryable();
+    IQueryable<Class> classlist = Enumerable.Empty<Class>().AsQueryable();
+    PaginationState state = new PaginationState { ItemsPerPage = 15 };
+    string nameFilter;
+    private string lastName = " ";
+    private string firstName = " ";
+    private int myVar;
+    private bool isStudentinClass = false;
+
+    public int MyProperty
+    {
+        get { return myVar; }
+        set { myVar = value; }
+    }
+
+    bool preventDefaultForSearch = false;
+    Student selectedStudent = new();
+    private Class ClassData;
+    private User UserData;
+    private int studentForDelete = 0;
+    IQueryable<Student> FilteredStudents
+    {
+        get
+        {
+            var result = studlist;
+
+            if (!string.IsNullOrEmpty(nameFilter))
+            {
+                result = result.Where(s => s.Lastname.Contains(nameFilter, StringComparison.CurrentCultureIgnoreCase) || s.Firstname.Contains(nameFilter, StringComparison.CurrentCultureIgnoreCase));
+            }
+            return result;
+        }
+    }
+    IQueryable<Student> StudentList
+    {
+        get
+        {
+            var result = allstudent;
+
+            if (!string.IsNullOrEmpty(nameFilter))
+            {
+                result = result.Where(s => s.Lastname.Contains(nameFilter, StringComparison.CurrentCultureIgnoreCase) || s.Firstname.Contains(nameFilter, StringComparison.CurrentCultureIgnoreCase));
+            }
+            return result;
+        }
+    }
+
+    void RetrieveFromCache<T>(string key, Action<T> onSuccess)
+    {
+        if (CacheService.TryGetValue<T>(key, out var data))
+        {
+            onSuccess(data);
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+
+        RetrieveFromCache<User>("User", userData => UserData = userData);
+        RetrieveFromCache<Class>("Class", classData => ClassData = classData);
+
+        var data = await stu.GetAllStudentsAsync(ClassData.ClassID);
+        if (data.Data != null)
+        {
+            studentlist.Clear();
+            foreach (var item in data.Data)
+            {
+                var newstudent = new Student()
+                    {
+                        StudentID = item.StudentId,
+                        Lastname = item.Lastname,
+                        Firstname = item.Firstname,
+                        Middlename = item.Middlename,
+                        Gender = item.Gender,
+                        Birthdate = item.Birthdate,
+                        Remarks = item.Remarks,
+                        LRN = item.Lrn,
+                        CreatorID = item.CreatorId
+
+                    };
+                studentlist.Add(newstudent);
+            }
+        }
+        studlist = studentlist.AsQueryable();
+    }
+
+    async Task Load()
+    {
+
+        var result = await LoadClass(ClassData.ClassID);
+        studlist = result.AsQueryable();
+    }
+
+    async Task<List<Student>> LoadClass(int classid)
+    {
+        var data = await stu.GetAllStudentsAsync(classid);
+        if (data.Data != null)
+        {
+            studentlist.Clear();
+            foreach (var item in data.Data)
+            {
+                var newstudent = new Student()
+                    {
+                        StudentID = item.StudentId,
+                        Lastname = item.Lastname,
+                        Firstname = item.Firstname,
+                        Middlename = item.Middlename,
+                        Gender = item.Gender,
+                        Birthdate = item.Birthdate,
+                        Remarks = item.Remarks,
+                        LRN = item.Lrn,
+                        CreatorID = item.CreatorId
+                    };
+                studentlist.Add(newstudent);
+            }
+        }
+        return studentlist.ToList();
+    }
+    void DeleteFromClass(Student data)
+    {
+        studentForDelete = data.StudentID;
+    }
+
+    async Task ViewStudent(Student data)
+    {
+        var result = await stu.GetStudentFromClassByIdAsync(data.StudentID, ClassData.ClassID);
+
+        Student studentdata = new Student()
+            {
+                StudentID = result.Data.StudentId,
+                Lastname = result.Data.Lastname,
+                Firstname = result.Data.Firstname,
+                Middlename = result.Data.Middlename,
+                Gender = result.Data.Gender.Equals("M") ? "Male" : "Female",
+                Birthdate = DateTime.Parse(result.Data.Birthdate).ToString("MM/dd/yyyy"),
+                Remarks = !string.IsNullOrWhiteSpace(result.Data.Remarks) ? result.Data.Remarks : " ",
+                LRN = !string.IsNullOrWhiteSpace(result.Data.Lrn) ? result.Data.Lrn : " ",
+                CreatorID = result.Data.CreatorId
+            };
+
+        GetSelectedStudent(studentdata);
+    }
+    async Task AddStudentToClass(Student data)
+    {
+        var result = await stu.AddStudentoClassAsync(data.StudentID, ClassData.ClassID, UserData.UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }else{
+            toastService.ShowError(result.Message);
+        }
+        await Load();
+    }
+    async Task UpdateStudent(Student data)
+    {
+        var result = await stu.UpdateStudentAsync(data, UserData.UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await Load();
+    }
+
+    async Task AddStudentAfterAddClass(Student data)
+    {
+        var result = await stu.AddStudentAfterClass(data, UserData.UserID, ClassData.ClassID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await Load();
+    }
+    async Task AddNewStudent(Student data)
+    {
+        var result = await stu.AddNewStudent(data, ClassData.ClassID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await Load();
+    }
+    async void GetSelectedStudent(Student data)
+    {
+        isStudentinClass = studlist.Where(s => s.StudentID == data.StudentID).Any();
+        selectedStudent = data;
+    }
+    void ResetList()
+    {
+        if (allstudent != null)
+        {
+            allstudent = Enumerable.Empty<Student>().AsQueryable();
+            lastName = "";
+            firstName = "";
+        }
+    }
+
+    async Task ImportFromClass()
+    {
+        await LoadSchoolYear();
+        var classresult = await ClassService.GetClassByUserSchoolYearAsync(UserData.UserID, 0);
+        classlist = classresult.Data != null ? classresult.Data.AsQueryable() : null;
+    }
+
+    async Task ImportStudent(Class classdata)
+    {
+        try
+        {
+            var result = await LoadClass(classdata.ClassID);
+            foreach (var item in result)
+            {
+                var data = await stu.AddStudentoClassAsync(item.StudentID, ClassData.ClassID, UserData.UserID);
+            }
+            toastService.ShowSuccess("Import Successful");
+        }
+        catch (Exception ex) 
+        {
+            toastService.ShowError(ex.Message);
+        }
+
+        await Load();
+    }
+    async Task SearchStudent()
+    {
+        var search = new Student()
+        {
+                Lastname = !string.IsNullOrWhiteSpace(lastName) ? lastName : "",
+                Firstname = !string.IsNullOrWhiteSpace(firstName) ? firstName : ""
+        };
+        var data = await stu.SearchStudentsAsync(search);
+        if(data.Data != null)
+        {
+            studentlist.Clear();
+            foreach (var item in data.Data)
+            {
+                var newstudent = new Student()
+                    {
+                        StudentID = item.StudentId,
+                        Lastname = !string.IsNullOrWhiteSpace(item.Lastname) ? item.Lastname: " ",
+                        Firstname = !string.IsNullOrWhiteSpace(item.Firstname) ? item.Firstname : " ",
+                        Middlename = !string.IsNullOrWhiteSpace(item.Middlename) ? item.Middlename : " ",
+                        Gender = item.Gender.Equals("M") ? "Male" : "Female",
+                        Birthdate = DateTime.Parse(item.Birthdate).ToString("MM/dd/yyyy"),
+                        Remarks = !string.IsNullOrWhiteSpace(item.Remarks) ? item.Remarks : " ",
+                        LRN = item.Lrn,
+                        CreatorID = item.CreatorId
+
+                    };
+                studentlist.Add(newstudent);
+            }
+            allstudent = studentlist.AsQueryable();
+        }
+        else
+        {
+            ResetList();
+            toastService.ShowError(data.ErrorMessage.ToString());
+        }
+
+
+    }
+    async Task LoadSchoolYear()
+    {
+        var schoolyearresult = await ResourcesService.GetSchoolYearAsync();
+        schoolYearlist = schoolyearresult.Data != null ? schoolyearresult.Data.AsQueryable() : null;
+    }
+    async Task LoadClass(ChangeEventArgs e)
+    {
+        int selectedyear = int.Parse(e.Value.ToString());
+        var classresult = await ClassService.GetClassByUserSchoolYearAsync(UserData.UserID, selectedyear);
+        classlist = classresult.Data != null ? classresult.Data.AsQueryable() : null;
+    }
+
+    void DeleteReset()
+    {
+        studentForDelete = 0;
+    }
+    async Task DeleteConfirm()
+    {
+        var result = await stu.DeleteStudentFromClassAsync(studentForDelete, ClassData.ClassID, UserData.UserID);
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        DeleteReset();
+        await Load();
+
+    }
+
+    private bool IsAnyRequiredFieldEmpty()
+    {
+        // Define the required fields for the user model
+        var requiredFields = new[] { "Lastname", "Firstname", "Gender", "Birthdate", "LRN" };
+
+        // Check if any of the required fields are null, empty, or whitespace
+        return requiredFields.Any(field =>
+        string.IsNullOrWhiteSpace(selectedStudent.GetType().GetProperty(field)?.GetValue(selectedStudent)?.ToString()) ||
+        (field == "Lastname" && string.IsNullOrWhiteSpace(selectedStudent.Lastname)) ||
+        (field == "Firstname" && string.IsNullOrWhiteSpace(selectedStudent.Firstname)) ||
+        (field == "Gender" && string.IsNullOrWhiteSpace(selectedStudent.Gender)) ||
+        (field == "Birthdate" && string.IsNullOrWhiteSpace(selectedStudent.Birthdate)) ||
+        (field == "LRN" && string.IsNullOrWhiteSpace(selectedStudent.LRN)));
+    }
+    private void OnType(KeyboardEventArgs e)
+    {
+        var pattern = @"[<>:/\\""|?* ]";
+        preventDefaultForSearch = Regex.IsMatch(e.Key, pattern);
+    }
+
+    
+}

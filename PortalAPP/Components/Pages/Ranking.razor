@@ -1,0 +1,501 @@
+﻿@page "/ranking"
+
+@using ApplicationLayer.Services
+@using Blazored.Toast.Services
+@using DomainLayer.Entities
+@using DomainLayer.Models
+@using Microsoft.Extensions.Caching.Memory
+@using NetcodeHub.Packages.Components.Validations.OnInput
+@using Microsoft.AspNetCore.Components.QuickGrid
+@inject IToastService toastService
+@inject IClassRecordService classrec
+@inject ICacheService CacheService
+@inject IResourcesService ResourcesService
+
+
+<div class="h-100">
+    
+
+    <div class="row mt-2 shadow h-100">
+        <div class="container h-100 w-100">
+            <div class="row h-100 align-items-stretch d-flex flex-nowrap" style="overflow: auto; overflow-y: hidden;">
+                <div class="col h-100">
+                    <div class="h-100 row ranking-width">
+                        @if (recordModelQ1.Student == null)
+                        {
+                            <p>Loading ...</p>
+                        }
+                        else
+                        {
+                            <div class="h-100 table-responsive m-auto w-100">
+                                <table class="table table-bordered table-hover overflow-auto">
+                                    <thead>
+                                        <tr class="ranking-stick">
+                                            <th class="name-stick name-header text-center align-content-center" colspan="3">FIRST QUARTER</th>
+                                        </tr>
+                                        <tr class="header-stick">
+                                            <th class="name-stick name-header text-center align-content-center ranking-rank">Rank</th>
+                                            <th class="name-stick name-header text-center align-content-center ranking-names">Name</th>
+                                            <th class="name-stick name-header text-center align-content-center ranking-grades">Grades</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in recordModelQ1.Student)
+                                        {
+                                            <tr>
+
+                                                <td class="text-center align-content-center">@item.Q1Rank</td>
+                                                <td class="text-center align-content-center">@($"{item.Lastname}, {item.Firstname} {(!string.IsNullOrWhiteSpace(item.Middlename) ? item.Middlename.Substring(0, 1) : "")}")</td>
+                                                <td class="text-center align-content-center">@item.Q1</td>
+                                                
+                                            </tr>
+                                        }
+
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="col h-100">
+                    <div class="h-100 row ranking-width">
+                        @if (recordModelQ2.Student == null)
+                        {
+                            <p>Loading ...</p>
+                        }
+                        else
+                        {
+                            <div class="h-100 table-responsive m-auto w-100">
+                                <table class="table table-bordered table-hover overflow-auto">
+                                    <thead>
+                                        <tr class="ranking-stick">
+                                            <th class="name-stick name-header text-center align-content-center" colspan="3">SECOND QUARTER</th>
+                                        </tr>
+                                        <tr class="header-stick">
+                                            <th class="name-stick name-header text-center align-content-center ranking-rank">Rank</th>
+                                            <th class="name-stick name-header text-center align-content-center ranking-names">Name</th>
+                                            <th class="name-stick name-header text-center align-content-center ranking-grades">Grades</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in recordModelQ2.Student)
+                                        {
+                                            <tr>
+
+                                                <td class="text-center align-content-center">@item.Q2Rank</td>
+                                                <td class="text-center align-content-center">@($"{item.Lastname}, {item.Firstname} {(!string.IsNullOrWhiteSpace(item.Middlename) ? item.Middlename.Substring(0, 1) : "")}")</td>
+                                                <td class="text-center align-content-center">@item.Q2</td>
+                                                
+                                            </tr>
+                                        }
+
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="col h-100">
+                    <div class="h-100 row ranking-width">
+                        @if (recordModelQ3.Student == null)
+                        {
+                            <p>Loading ...</p>
+                        }
+                        else
+                        {
+                            <div class="h-100 table-responsive m-auto w-100">
+                                <table class="table table-bordered table-hover overflow-auto">
+                                    <thead>
+                                        <tr class="ranking-stick">
+                                            <th class="name-stick name-header text-center align-content-center" colspan="3">THIRD QUARTER</th>
+                                        </tr>
+                                        <tr class="header-stick">
+                                            <th class="name-stick name-header text-center align-content-center ranking-rank">Rank</th>
+                                            <th class="name-stick name-header text-center align-content-center ranking-names">Name</th>
+                                            <th class="name-stick name-header text-center align-content-center ranking-grades">Grades</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in recordModelQ3.Student)
+                                        {
+                                            <tr>
+
+                                                <td class="text-center align-content-center">@item.Q3Rank</td>
+                                                <td class="text-center align-content-center">@($"{item.Lastname}, {item.Firstname} {(!string.IsNullOrWhiteSpace(item.Middlename) ? item.Middlename.Substring(0, 1) : "")}")</td>
+                                                <td class="text-center align-content-center">@item.Q3</td>
+
+                                            </tr>
+                                        }
+
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="col h-100">
+                    <div class="h-100 row ranking-width">
+                        @if (recordModelQ4.Student == null)
+                        {
+                            <p>Loading ...</p>
+                        }
+                        else
+                        {
+                            <div class="h-100 table-responsive m-auto w-100">
+                                <table class="table table-bordered table-hover overflow-auto">
+                                    <thead>
+                                        <tr class="ranking-stick">
+                                            <th class="name-stick name-header text-center align-content-center" colspan="3">FOURTH QUARTER</th>
+                                        </tr>
+                                        <tr class="header-stick">
+                                            <th class="name-stick name-header text-center align-content-center ranking-rank">Rank</th>
+                                            <th class="name-stick name-header text-center align-content-center ranking-names">Name</th>
+                                            <th class="name-stick name-header text-center align-content-center ranking-grades">Grades</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in recordModelQ4.Student)
+                                        {
+                                            <tr>
+
+                                                <td class="text-center align-content-center">@item.Q4Rank</td>
+                                                <td class="text-center align-content-center">@($"{item.Lastname}, {item.Firstname} {(!string.IsNullOrWhiteSpace(item.Middlename) ? item.Middlename.Substring(0, 1) : "")}")</td>
+                                                <td class="text-center align-content-center">@item.Q4</td>
+
+                                            </tr>
+                                        }
+
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="col h-100">
+                    <div class="h-100 row ranking-width">
+                        @if (recordModelFinal.Student == null)
+                        {
+                            <p>Loading ...</p>
+                        }
+                        else
+                        {
+                            <div class="h-100 table-responsive m-auto w-100">
+                                <table class="table table-bordered table-hover overflow-auto">
+                                    <thead>
+                                        <tr class="ranking-stick">
+                                            <th class="name-stick name-header text-center align-content-center" colspan="3">FINAL RANKING</th>
+                                        </tr>
+                                        <tr class="header-stick">
+                                            <th class="name-stick name-header text-center align-content-center ranking-rank">Rank</th>
+                                            <th class="name-stick name-header text-center align-content-center ranking-names">Name</th>
+                                            <th class="name-stick name-header text-center align-content-center ranking-grades">Grades</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in recordModelFinal.Student)
+                                        {
+                                            <tr>
+
+                                                <td class="text-center align-content-center">@item.Rank</td>
+                                                <td class="text-center align-content-center">@($"{item.Lastname}, {item.Firstname} {(!string.IsNullOrWhiteSpace(item.Middlename) ? item.Middlename.Substring(0, 1) : "")}")</td>
+                                                <td class="text-center align-content-center">@item.FinalGrade</td>
+
+                                            </tr>
+                                        }
+
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+</div>
+
+@code {
+
+    List<Quarter> quarterlist = new();
+    RecordModel recordModelsummary= new();
+    RecordModel recordModelQ1 = new();
+    RecordModel recordModelQ2 = new();
+    RecordModel recordModelQ3 = new();
+    RecordModel recordModelQ4= new();
+    RecordModel recordModelFinal= new();
+    RecordModel recordModel= new();
+    Class ClassData = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        RetrieveFromCache<Class>("Class", classData => ClassData = classData);
+        var quarter = await classrec.GetQuartersAsync();
+        quarterlist = quarter != null ? quarter.Data : null;
+        recordModel = await GetSummary(ClassData.ClassID);
+        Quarter summary = new()
+        {
+            QuarterID = 5,
+            QuarterName = "Final Ranking"
+        };
+        quarterlist.Add(summary);
+
+        await LoadGrades();
+    }
+    void RetrieveFromCache<T>(string key, Action<T> onSuccess)
+    {
+        if (CacheService.TryGetValue<T>(key, out var data))
+        {
+            onSuccess(data);
+        }
+    }
+
+    async Task LoadRecordbyQuarterID(ChangeEventArgs e)
+    {
+
+        int type = int.Parse(e.Value.ToString());
+        if(type == 1)
+        {
+            recordModelQ1 = await LoadQ1(recordModel);
+        }
+        else if (type == 2)
+        {
+            recordModelQ2 = await LoadQ2(recordModel);
+        }
+        else if (type == 3)
+        {
+            recordModelQ3 = await LoadQ3(recordModel);
+        }
+        else if (type == 4)
+        {
+            recordModelQ4 = await LoadQ4(recordModel);
+        }
+        else if (type == 5)
+        {
+            recordModelFinal = await LoadFinal(recordModel);
+        }
+    }
+
+    async Task LoadGrades()
+    {
+        recordModelQ1 = await LoadQ1(recordModel);
+        recordModelQ2 = await LoadQ2(recordModel);
+        recordModelQ3 = await LoadQ3(recordModel);
+        recordModelQ4 = await LoadQ4(recordModel);
+        recordModelFinal = await LoadFinal(recordModel);
+    }
+    async Task<RecordModel> LoadQ1(RecordModel record)
+    {
+        var sortedStudents = record.Student.OrderByDescending(s => s.Q1).ToList();
+
+        int currentRank = 1;
+        for (int i = 0; i < sortedStudents.Count; i++)
+        {
+            if (i > 0 && sortedStudents[i].Q1 == sortedStudents[i - 1].Q1)
+            {
+                sortedStudents[i].Q1Rank = sortedStudents[i - 1].Q1Rank;
+            }
+            else
+            {
+                sortedStudents[i].Q1Rank = currentRank;
+            }
+            currentRank++;
+        }
+
+        // Update the original list with the ranks
+        foreach (var student in record.Student)
+        {
+            var rankedStudent = sortedStudents.First(s => s.StudentId == student.StudentId);
+            student.Q1Rank = rankedStudent.Q1Rank;
+        }
+        record.Student = record.Student.OrderBy(s => s.Q1Rank).ToArray();
+        return record;
+    }
+    async Task<RecordModel> LoadQ2(RecordModel record)
+    {
+        var sortedStudents = record.Student.OrderByDescending(s => s.Q2).ToList();
+
+        int currentRank = 1;
+        for (int i = 0; i < sortedStudents.Count; i++)
+        {
+            if (i > 0 && sortedStudents[i].Q2 == sortedStudents[i - 1].Q2)
+            {
+                sortedStudents[i].Q2Rank = sortedStudents[i - 1].Q2Rank;
+            }
+            else
+            {
+                sortedStudents[i].Q2Rank = currentRank;
+            }
+            currentRank++;
+        }
+
+        // Update the original list with the ranks
+        foreach (var student in record.Student)
+        {
+            var rankedStudent = sortedStudents.First(s => s.StudentId == student.StudentId);
+            student.Q2Rank = rankedStudent.Q2Rank;
+        }
+        record.Student = record.Student.OrderBy(s => s.Q2Rank).ToArray();
+        return record;
+    }
+
+    async Task<RecordModel> LoadQ3(RecordModel record)
+    {
+        var sortedStudents = record.Student.OrderByDescending(s => s.Q3).ToList();
+
+        int currentRank = 1;
+        for (int i = 0; i < sortedStudents.Count; i++)
+        {
+            if (i > 0 && sortedStudents[i].Q3 == sortedStudents[i - 1].Q3)
+            {
+                sortedStudents[i].Q3Rank = sortedStudents[i - 1].Q3Rank;
+            }
+            else
+            {
+                sortedStudents[i].Q3Rank = currentRank;
+            }
+            currentRank++;
+        }
+
+        // Update the original list with the ranks
+        foreach (var student in record.Student)
+        {
+            var rankedStudent = sortedStudents.First(s => s.StudentId == student.StudentId);
+            student.Q3Rank = rankedStudent.Q3Rank;
+        }
+        record.Student = record.Student.OrderBy(s => s.Q3Rank).ToArray();
+        return record;
+    }
+    async Task<RecordModel> LoadQ4(RecordModel record)
+    {
+        var sortedStudents = record.Student.OrderByDescending(s => s.Q4).ToList();
+
+        int currentRank = 1;
+        for (int i = 0; i < sortedStudents.Count; i++)
+        {
+            if (i > 0 && sortedStudents[i].Q4 == sortedStudents[i - 1].Q4)
+            {
+                sortedStudents[i].Q4Rank = sortedStudents[i - 1].Q4Rank;
+            }
+            else
+            {
+                sortedStudents[i].Q4Rank = currentRank;
+            }
+            currentRank++;
+        }
+
+        // Update the original list with the ranks
+        foreach (var student in record.Student)
+        {
+            var rankedStudent = sortedStudents.First(s => s.StudentId == student.StudentId);
+            student.Q4Rank = rankedStudent.Q4Rank;
+        }
+        record.Student = record.Student.OrderBy(s => s.Q4Rank).ToArray();
+        return record;
+    }
+    async Task<RecordModel> LoadFinal(RecordModel record)
+    {
+        var sortedStudents = record.Student.OrderByDescending(s => s.FinalGrade).ToList();
+
+        int currentRank = 1;
+        for (int i = 0; i < sortedStudents.Count; i++)
+        {
+            if (i > 0 && sortedStudents[i].FinalGrade == sortedStudents[i - 1].FinalGrade)
+            {
+                sortedStudents[i].Rank = sortedStudents[i - 1].Rank;
+            }
+            else
+            {
+                sortedStudents[i].Rank = currentRank;
+            }
+            currentRank++;
+        }
+
+        // Update the original list with the ranks
+        foreach (var student in record.Student)
+        {
+            var rankedStudent = sortedStudents.First(s => s.StudentId == student.StudentId);
+            student.Rank = rankedStudent.Rank;
+        }
+        record.Student = record.Student.OrderBy(s => s.Rank).ToArray();
+        return record;
+    }
+    async Task<RecordModel> GetSummary(int classid)
+    {
+        var qtr = await classrec.GetQuarterSummary(classid);
+        foreach (var item in qtr.Student)
+        {
+            int qrtrGrade = 0;
+            foreach (var data in item.Quarters)
+            {
+                item.TotalWrittenScore = 0;
+                item.AverageWrittenScore = 0;
+
+                item.TotalPerformanceScore = 0;
+                item.AveragePerformanceScore = 0;
+
+                item.TotalPeridiocialScore = 0;
+                item.AveragePeriodicalScore = 0;
+
+                if (data.Value.WrittenOutput != null && data.Value.WrittenOutput.Count != 0)
+                {
+                    int totalWRT = 0;
+                    double wScore = 0.0;
+                    foreach (var keys in data.Value.WrittenOutput)
+                    {
+                        item.TotalWrittenScore += keys.Value.WrittenData.Score;
+                        totalWRT += keys.Value.MaxScore;
+                        wScore = keys.Value.WeightedScore;
+                    }
+                    item.AverageWrittenScore = (((double)item.TotalWrittenScore / totalWRT) * 100 * wScore);
+
+                }
+                if (data.Value.PerformanceOutput != null && data.Value.PerformanceOutput.Count != 0)
+                {
+                    int totalPRF = 0;
+                    double wScore = 0.0;
+                    foreach (var keys in data.Value.PerformanceOutput)
+                    {
+                        item.TotalPerformanceScore += keys.Value.PerformanceData.Score;
+                        totalPRF += keys.Value.MaxScore; 
+                        wScore = keys.Value.WeightedScore;
+                    }
+                    item.AveragePerformanceScore = (((double)item.TotalPerformanceScore / totalPRF) * 100 * wScore);
+                }
+                if (data.Value.PeriodicalOutput != null && data.Value.PeriodicalOutput.Count != 0)
+                {
+
+                    int totalPRD = 0;
+                    double wScore = 0.0;
+                    foreach (var keys in data.Value.PeriodicalOutput)
+                    {
+                        item.TotalPeridiocialScore += keys.Value.PeriodicalData.Score;
+                        totalPRD += keys.Value.MaxScore;
+                        wScore = keys.Value.WeightedScore;
+                    }
+
+                    item.AveragePeriodicalScore = (((double)item.TotalPeridiocialScore / totalPRD) * 100 * wScore);
+                }
+                item.InitialGrade = item.AverageWrittenScore + item.AveragePerformanceScore + item.AveragePeriodicalScore;
+                var grade = await classrec.GetGradeRulesAsync(item.InitialGrade);
+                data.Value.Grade = grade.Data != 0 ? grade.Data : 0;
+                qrtrGrade += data.Value.Grade;
+
+                if(data.Value.QuarterID == 1){ item.Q1 = data.Value.Grade; }
+                if (data.Value.QuarterID == 2) { item.Q2 = data.Value.Grade; }
+                if(data.Value.QuarterID == 3){ item.Q3 = data.Value.Grade; }
+                if (data.Value.QuarterID == 4) { item.Q4 = data.Value.Grade; }
+            }
+            item.FinalGrade = qrtrGrade / 4;
+            item.GradeRemarks = item.FinalGrade <= 74 ? "FAILED" : "PASSED";
+
+        }
+        return qtr;
+    }
+}

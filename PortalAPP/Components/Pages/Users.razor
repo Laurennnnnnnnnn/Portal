@@ -1,0 +1,267 @@
+﻿@page "/users"
+@using ApplicationLayer.DTOs
+@using ApplicationLayer.Services
+@using DomainLayer.Entities
+@using NetcodeHub.Packages.Components.Validations.OnInput
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Blazored.Toast.Services
+@inject IToastService toastService
+@inject IUserService UserService
+@inject ICacheService CacheService
+
+<div class="h-100">
+    <div class="row h-50 gap-0">
+        <div class="col h-100">
+            <div class="m-1 h-100 mh-100 shadow p-2">
+                <label class="fw-bold">Unverified User</label>
+                <div class="mb-2 text-end">
+                    <div class="row">
+                        <div class="col m-auto">
+                            <button type="button" class="btn btn-primary" data-bs-target="#classadd" data-bs-toggle="modal">Add Class</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-auto h-75">
+                <QuickGrid Class="table table-hover table-responsive mt-0" Items="@unverifiedlist" Theme="corporate">
+                    <PropertyColumn Property="ver => (ver.Username)" Title="Username" Class="align-items-center" Sortable="true" />
+                    <PropertyColumn Property="ver => (ver.Fullname)" Title="Fullname" Class="align-items-center" Sortable="true"/>
+                    <PropertyColumn Property="ver => (ver.CategoryName)" Title="Category" Class="align-items-center" Sortable="true"/>
+                    <PropertyColumn Property="ver => (ver.Designation)" Title="Fullname" Class="align-items-center" Sortable="true"/>
+                    <TemplateColumn Context="ver" Title="Actions" Class="justify-content-evenly border-0">
+                            <button class="btn text-success" data-bs-target="#userdadd" data-bs-toggle="modal" @onclick="() => LoadUserInfor(ver)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16">
+                                    <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z" />
+                                </svg>
+                            </button>
+                    </TemplateColumn>
+                </QuickGrid>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row h-50 gap-0">
+        <div class="col h-100">
+
+            <div class="m-1 h-100 mh-100 shadow p-2">
+                <label class="fw-bold">Verified User</label>
+                <div class="mb-2 text-end">
+                    <div class="row">
+                        <div class="col m-auto">
+                            <button type="button" class="btn btn-primary" data-bs-target="#sectionadd" data-bs-toggle="modal">Add Section</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-auto h-75">
+                    <QuickGrid Class="table table-hover table-responsive mt-0" Items="@verifiedlist" Theme="corporate">
+                        <PropertyColumn Property="unver => (unver.Username)" Title="Username" Class="align-items-center" Sortable="true" />
+                        <PropertyColumn Property="unver => (unver.Fullname)" Title="Fullname" Class="align-items-center" Sortable="true" />
+                        <PropertyColumn Property="unver => (unver.CategoryName)" Title="Category" Class="align-items-center" Sortable="true" />
+                        <PropertyColumn Property="unver => (unver.Designation)" Title="Designation" Class="align-items-center" Sortable="true" />
+                        <TemplateColumn Context="unver" Title="Actions" Class="justify-content-evenly border-0">
+                            <button class="btn text-success" data-bs-target="#userdadd" data-bs-toggle="modal" @onclick="() => LoadVerUser(unver)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16">
+                                    <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z" />
+                                </svg>
+                            </button>
+                            <button class="btn text-danger" data-bs-target="#confirmationmodal" data-bs-toggle="modal" @onclick="() => DeleteUser(unver)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-archive-fill" viewBox="0 0 16 16">
+                                    <path d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15zM5.5 7h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1M.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8z" />
+                                </svg>
+                            </button>
+                        </TemplateColumn>
+                    </QuickGrid>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</div>
+<div class="modal fade" id="userdadd" aria-hidden="true" aria-labelledby="userdaddLabel2" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="userdaddLabel2">User Details</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if (Userinfor == null)
+                {
+                    <p>Loading...</p>
+                }
+                else
+                {
+                    <EditForm Model="Userinfor">
+                        <DataAnnotationsValidator />
+                        <div class="container text-center">
+                            <div class="row w-100">
+                                <div class="w-25 rounded-1">
+                                    <div class="m-auto top-0 ">
+                                        <img src="/images/portal_logo.png" width="150" height="150" />
+                                    </div>
+                                </div>
+                                <div class="w-75">
+                                    <div class="container text-center">
+                                        <div class="row m-2">
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="username" @bind="Userinfor.Username" placeholder="Username" onkeypress="if(event.charCode != 8 && event.charCode != 0 &&
+                                                       !((event.charCode>= 48 && event.charCode <= 57) ||
+                                                (event.charCode >= 65 && event.charCode <= 90) ||
+                                                (event.charCode >= 97 && event.charCode <= 122))) {
+                                                event.preventDefault();
+                                                }">
+                                                    <label for="username">Username</label>
+                                                </form>
+                                            </div>
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="text" class="form-control" id="fname" @bind="Userinfor.Fullname" placeholder="Fullname" oninput="this.value = this.value.toUpperCase();">
+                                                    <label for="fname">Fullname</label>
+                                                </form>
+                                            </div>
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <input type="password" class="form-control" id="pass" @bind="Userinfor.Password" placeholder="Password">
+                                                    <label for="pass">Password</label>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        <div class="row m-2">
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <select class="form-control" id="quarter" @bind="Userinfor.UserTypeID">
+                                                        <option selected>Please select User Type</option>
+                                                        @foreach (var item in userType)
+                                                        {
+                                                            <option value="@item.UserTypeID">@item.UserTypeName</option>
+                                                        }
+                                                    </select>
+                                                    <label for="quarter">User Type</label>
+                                                </form>
+                                            </div>
+                                            <div class="col m-auto">
+                                                <form class="form-floating">
+                                                    <select class="form-control" id="quarter" @bind="Userinfor.CategoryID">
+                                                        <option selected>Please select Category</option>
+                                                        @foreach (var item in category)
+                                                        {
+                                                            <option value="@item.CategoryID">@item.CategoryName</option>
+                                                        }
+                                                    </select>
+                                                    <label for="quarter">Category</label>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </EditForm>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary @(Userinfor.UserID != 0 ? "d-none" : "")" data-bs-dismiss="modal" @onclick="() => SaveUser(Userinfor)">Save</button>
+                <button class="btn btn-primary @(Userinfor.UserID == 0 ? "d-none" : "")" data-bs-dismiss="modal" @onclick="() => UpdateUser(Userinfor)">Update</button>
+                <button class="btn btn-primary @(Userinfor.Activate && Userinfor.UserID != 0 ? "" : "d-none")" data-bs-dismiss="modal" @onclick="() => UnverifyUser(Userinfor)">Deactivate</button>
+                <button class="btn btn-primary @(!Userinfor.Activate  && Userinfor.UserID != 0 ? "" : "d-none")" data-bs-dismiss="modal" @onclick="() => VerifyUser(Userinfor)">Verify</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="position-fixed btnadd">
+    <button class="btn btn-primary btn-studentadd" data-bs-target="#userdadd" data-bs-toggle="modal" @onclick="()=>NewUser()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-person-fill-add" viewBox="0 0 16 16">
+            <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0" />
+            <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4" />
+        </svg>
+    </button>
+</div>
+@code {
+    IQueryable<User> verifiedlist = Enumerable.Empty<User>().AsQueryable();
+    IQueryable<User> unverifiedlist = Enumerable.Empty<User>().AsQueryable();
+
+    User Userinfor = new();
+    List<UserType> userType = new();
+    List<Category> category = new();
+
+    User UserData = new();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        RetrieveFromCache<User>("User", userData => UserData = userData);
+        await Load();
+        var usertype = await UserService.GetUserType();
+        userType = usertype.Data != null ? usertype.Data : new List<UserType>();
+        var categ = await UserService.GetCategory();
+        category = categ.Data != null ? categ.Data : new List<Category>();
+
+
+        // var payroll = await UserService.PostPayroll();
+
+
+    }
+    void RetrieveFromCache<T>(string key, Action<T> onSuccess)
+    {
+        if (CacheService.TryGetValue<T>(key, out var data))
+        {
+            onSuccess(data);
+        }
+    }
+    async Task Load()
+    {
+        var verresult = await UserService.GetAllVerifiedUser();
+        verifiedlist = verresult.Data != null ? verresult.Data.AsQueryable() : Enumerable.Empty<User>().AsQueryable();
+        var unverresult = await UserService.GetAllUnverifiedUser();
+        unverifiedlist = unverresult.Data != null ? unverresult.Data.AsQueryable() : Enumerable.Empty<User>().AsQueryable();
+    }
+    async Task SaveUser(User data){
+        var result = await UserService.AddUser(data);
+        await ShowToast(result);
+    }
+    async Task UpdateUser(User data)
+    {
+        var result = await UserService.UpdateUser(data);
+        await ShowToast(result);
+    }
+    async Task VerifyUser(User data)
+    {
+        var result = await UserService.VerifyUser(data.UserID, UserData.UserID);
+        await ShowToast(result);
+    }
+    async Task UnverifyUser(User data)
+    {
+        var result = await UserService.UnverifyUser(data.UserID, UserData.UserID);
+        await ShowToast(result);
+    }
+    async Task DeleteUser(User data)
+    {
+        var result = await UserService.DeleteUser(data.UserID, UserData.UserID);
+        await ShowToast(result);
+    }
+    void LoadUserInfor(User data)
+    {
+        Userinfor = unverifiedlist.FirstOrDefault(unver => unver.UserID == data.UserID);
+    }
+    void LoadVerUser(User data)
+    {
+        Userinfor = verifiedlist.FirstOrDefault(ver => ver.UserID == data.UserID);
+    }
+    async Task ShowToast(ServiceResponse result)
+    {
+        if (result.Flag)
+        {
+            toastService.ShowSuccess(result.Message);
+        }
+        else
+        {
+            toastService.ShowError(result.Message);
+        }
+        await Load();
+    }
+    void NewUser()
+    {
+        Userinfor = new();
+    }
+}

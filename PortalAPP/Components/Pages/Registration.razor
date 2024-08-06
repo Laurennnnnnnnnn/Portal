@@ -1,0 +1,119 @@
+﻿@page "/registration"
+@using ApplicationLayer.Services
+@using Blazored.Toast.Services
+@using DomainLayer.Entities
+@inject IToastService toastService
+@inject ICacheService CacheService
+@inject IUserService UserService
+@inject NavigationManager NavManager
+
+<div class="row h-100 m-0">
+    <div class="col login-background h-100">
+        <img src="/images/login_logo.png" class="login-image" />
+    </div>
+    <div class="col h-100">
+        <div class="justify-content-center w-50 align-content-center m-auto">
+            <div class="login-container">
+                <h3>Hello again!</h3>
+                <EditForm Model="user" class="w-100">
+                    <DataAnnotationsValidator />
+                    <div class="row justify-content-evenly">
+                        <div class="col my-2">
+                            <form class="form-floating m-2">
+                                <input type="text" class="form-control" id="usern" @bind="user.Username" placeholder="Username">
+                                <label for="usern">Username</label>
+                            </form>
+                            <form class="form-floating m-2">
+                                <input type="text" class="form-control" id="fname" @bind="user.Fullname" placeholder="Fullname">
+                                <label for="fname">Fullname</label>
+                            </form>
+                            <form class="form-floating m-2">
+                                <input type="password" class="form-control" id="pass" @bind="user.Password" placeholder="Password">
+                                <label for="pass">Password</label>
+                            </form>
+                            <form class="form-floating m-2">
+                                <input type="text" class="form-control" id="design" @bind="user.Designation" placeholder="Designation">
+                                <label for="design">Designation (e.g. Teacher 1)</label>
+                            </form>
+                            <form class="form-floating m-2">
+                                @if (category != null)
+                                {
+                                    <select class="form-control" id="section" @bind="user.CategoryID">
+                                        <option selected hidden>Please select Section</option>
+                                        @foreach (var item in category)
+                                        {
+                                            <option value="@item.CategoryID">@item.CategoryName</option>
+                                        }
+                                    </select>
+                                    <label for="section">Section</label>
+                                }
+                            </form>
+                            <form class="form-floating m-2">
+                                @if (userType != null)
+                                {
+                                    <select class="form-control" id="subject" @bind="user.UserTypeID">
+                                        <option selected hidden>Please select Subject</option>
+                                        @foreach (var item in userType)
+                                        {
+                                            <option value="@item.UserTypeID">@item.UserTypeName</option>
+                                        }
+                                    </select>
+                                    <label for="subject">Subject</label>
+                                }
+                            </form>
+                        </div>
+                    </div>
+                </EditForm>
+                <button type="button" class="btn btn-primary w-100 mt-2 user-input"
+                disabled="@IsAnyRequiredFieldEmpty()"
+                @onclick="() => RegisterUser(user)">Register</button>
+                <p class="mt-2 text-center"><a type="button" class="link-offset-2 link-underline link-underline-opacity-0" @onclick="() => GotoLogin()">Login with Existing Account</a></p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@code {
+    User user = new();
+    List<UserType> userType = new();
+    List<Category> category = new();
+    protected override async Task OnInitializedAsync()
+    {
+         var usertype = await UserService.GetUserType();
+        userType = usertype.Data != null ? usertype.Data : null;
+        var categ = await UserService.GetCategory();
+        category = categ.Data != null ? categ.Data : null;        
+    }
+    async Task RegisterUser(User user)
+    {
+       
+        var userresult = await UserService.AddUser(user);
+        if (userresult.Flag)
+        {
+            toastService.ShowSuccess($"{userresult.Message}: Please wait Admin to verify your registration.");
+            NavManager.NavigateTo("/");
+        }
+        else
+        {
+            toastService.ShowError(userresult.Message);
+        }
+
+    }
+    private bool IsAnyRequiredFieldEmpty()
+    {
+        // Define the required fields for the user model
+        var requiredFields = new[] { "Username", "Fullname", "Password", "Designation", "UserTypeID", "CategoryID", "Designation" };
+
+        // Check if any of the required fields are null, empty, or whitespace
+        return requiredFields.Any(field =>
+        string.IsNullOrWhiteSpace(user.GetType().GetProperty(field)?.GetValue(user)?.ToString()) ||
+        (field == "CategoryID" && user.CategoryID == 0) ||
+        (field == "UserTypeID" && user.UserTypeID == 0));
+    }
+
+    void GotoLogin()
+    {
+        NavManager.NavigateTo("/");
+    }
+}

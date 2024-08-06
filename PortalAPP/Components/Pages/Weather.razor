@@ -1,0 +1,287 @@
+﻿@page "/weather"
+@using ChartJs.Blazor.BarChart
+
+<Chart Config="_config" @ref="_chart"></Chart>
+
+<button @onclick="RandomizeData">Randomize Data</button>
+<button @onclick="AddDataset">Add Dataset</button>
+<button @onclick="RemoveDataset">Remove Dataset</button>
+<button @onclick="RemoveAllDataset">Remove All DataSet</button>
+<button @onclick="AddData">Add Data</button>
+<button @onclick="RemoveData">Remove Data</button>
+<button @onclick="RemoveAllData">Remove All Data</button>
+<button @onclick="AddDataandDataSet">Add Data and Date Set</button>
+<button @onclick="ReloadNewLabels">Reload New Chart Data</button>
+@code {
+    private const int InitalCount = 7;
+    private BarConfig _config;
+    private Random _rng = new Random();
+    private Chart _chart;
+    private string chartTitle = "";
+
+    public class LabelProperties
+    {
+        public string LabelName { get; set; } = string.Empty;
+        public string LabelColor { get; set; } = string.Empty;
+    }
+    private static readonly List<string> Quarters = new List<string>
+    {
+        "1st Quarter", "2nd Quarter", "3rd Quarter", "4th Quarter"
+    };
+
+    private static readonly List<string> GradeRange = new List<string>
+    {
+        "98-100", "95-97", "90-94", "85-89", "80-84", "75-79", "60-74"
+    };
+
+    private List<LabelProperties> labels = new();
+
+    public static class ChartColors
+    {
+        public static readonly string Red = "rgba(255, 99, 132, 1)";
+        public static readonly string Blue = "rgba(54, 162, 235, 1)";
+        public static readonly string Yellow = "rgba(255, 206, 86, 1)";
+        public static readonly string Green = "rgba(75, 192, 192, 1)";
+        public static readonly string Purple = "rgba(153, 102, 255, 1)";
+        public static readonly string Orange = "rgba(255, 159, 64, 1)";
+
+        public static readonly List<string> All = new List<string>
+        {
+            Red, Blue, Yellow, Green, Purple, Orange
+        };
+    }
+
+    protected override void OnInitialized()
+    {
+        InitializeChart();
+    }
+
+    private void InitializeChart()
+    {
+        chartTitle = "ChartJs.Blazor Bar Chart";
+        _config = new BarConfig
+            {
+                Options = new BarOptions
+                {
+                    Responsive = true,
+                    Legend = new Legend
+                    {
+                        Position = Position.Top
+                    },
+                    Title = new OptionsTitle
+                    {
+                        Display = true,
+                        Text = "ChartJs.Blazor Bar Chart"
+
+                    }
+                }
+            };
+
+        IDataset<int> dataset1 = new BarDataset<int>(RandomScalingFactor(InitalCount))
+            {
+                Label = "My first dataset",
+                BackgroundColor = ChartColors.Red,
+                BorderColor = ChartColors.Red,
+                BorderWidth = 1
+            };
+
+        IDataset<int> dataset2 = new BarDataset<int>(RandomScalingFactor(InitalCount))
+            {
+                Label = "My second dataset",
+                BackgroundColor = ChartColors.Blue,
+                BorderColor = ChartColors.Blue,
+                BorderWidth = 1
+            };
+
+        _config.Data.Labels.Clear();
+        foreach (var item in Quarters.Take(InitalCount))
+        {
+            _config.Data.Labels.Add(item);
+        }
+
+        _config.Data.Datasets.Clear();
+        _config.Data.Datasets.Add(dataset1);
+        _config.Data.Datasets.Add(dataset2);
+
+
+    }
+
+
+
+    private void RandomizeData()
+    {
+        foreach (IDataset<int> dataset in _config.Data.Datasets)
+        {
+            int count = dataset.Count;
+            dataset.Clear();
+            for (int i = 0; i < count; i++)
+            {
+                if (_rng.NextDouble() < 0.2)
+                {
+                    dataset.Add(0);
+                }
+                else
+                {
+                    dataset.Add(RandomScalingFactor());
+                }
+            }
+        }
+
+        _chart.Update();
+    }
+
+    private void AddDataset()
+    {
+        string color = ChartColors.All[_config.Data.Datasets.Count % ChartColors.All.Count];
+        var newDataset = new BarDataset<int>(RandomScalingFactor(_config.Data.Labels.Count))
+            {
+                Label = $"Dataset {_config.Data.Datasets.Count + 1}",
+                BackgroundColor = color,
+                BorderColor = color,
+                BorderWidth = 1
+            };
+
+        _config.Data.Datasets.Add(newDataset);
+
+
+        _chart.Update();
+    }
+
+    private void RemoveDataset()
+    {
+        IList<IDataset> datasets = _config.Data.Datasets;
+        if (datasets.Count == 0)
+            return;
+
+        datasets.RemoveAt(datasets.Count - 1);
+        _chart.Update();
+    }
+    private void RemoveAllDataset()
+    {
+        IList<IDataset> datasets = _config.Data.Datasets;
+        if (datasets.Count == 0)
+            return;
+        datasets.Clear();
+        _chart.Update();
+    }
+
+    private void AddData()
+    {
+        if (_config.Data.Datasets.Count == 0)
+            return;
+
+        string month = Quarters[_config.Data.Labels.Count % Quarters.Count];
+        _config.Data.Labels.Add(month);
+
+        foreach (IDataset<int> dataset in _config.Data.Datasets)
+        {
+            dataset.Add(RandomScalingFactor());
+        }
+
+        _chart.Update();
+    }
+
+    private void AddDataandDataSet()
+    {
+        // if (_config.Data.Datasets.Count == 0)
+        //     return;
+
+        string month = Quarters[_config.Data.Labels.Count % Quarters.Count];
+        _config.Data.Labels.Add(month);
+
+        foreach (IDataset<int> dataset in _config.Data.Datasets)
+        {
+            dataset.Add(RandomScalingFactor());
+        }
+
+        string color = ChartColors.All[_config.Data.Datasets.Count % ChartColors.All.Count];
+        var newDataset = new BarDataset<int>(RandomScalingFactor(_config.Data.Labels.Count))
+            {
+                Label = $"Dataset {_config.Data.Datasets.Count + 1}",
+                BackgroundColor = color,
+                BorderColor = color,
+                BorderWidth = 1
+            };
+
+        _config.Data.Datasets.Add(newDataset);
+
+
+        _chart.Update();
+    }
+
+    private void ReloadNewLabels()
+    {
+
+        RemoveAllData();
+        labels.Add(new LabelProperties { LabelName = "Male", LabelColor = ChartColors.Blue });
+        labels.Add(new LabelProperties { LabelName = "Female", LabelColor = ChartColors.Red });
+        labels.Add(new LabelProperties { LabelName = "All", LabelColor = ChartColors.Yellow });
+
+        foreach (var item in GradeRange)
+        {
+            //string grades = GradeRange[_config.Data.Labels.Count % GradeRange.Count];
+            _config.Data.Labels.Add(item);
+
+            foreach (IDataset<int> dataset in _config.Data.Datasets)
+            {
+                dataset.Add(RandomScalingFactor());
+            }
+        }
+
+        foreach (var item in labels)
+        {
+            string color = ChartColors.All[_config.Data.Datasets.Count % ChartColors.All.Count];
+            var newDataset = new BarDataset<int>(RandomScalingFactor(_config.Data.Labels.Count))
+                {
+                    Label = item.LabelName,
+                    BackgroundColor = item.LabelColor,
+                    BorderColor = item.LabelColor,
+                    BorderWidth = 1
+                };
+
+            _config.Data.Datasets.Add(newDataset);
+        }
+
+        //chartTitle = "Quarterly Grade Summary";
+        _config.Options.Title.Text = "Quarterly Grade Summary";
+
+        _chart.Update();
+
+    }
+
+    private void RemoveData()
+    {
+        if (_config.Data.Datasets.Count == 0)
+            return;
+
+        _config.Data.Labels.RemoveAt(_config.Data.Labels.Count - 1);
+
+        foreach (IDataset<int> dataset in _config.Data.Datasets)
+        {
+            dataset.RemoveAt(dataset.Count - 1);
+        }
+        
+        
+        _chart.Update();
+    }
+
+    private void RemoveAllData()
+    {
+        if (_config.Data.Datasets.Count == 0)
+            return;
+
+        _config.Data.Labels.Clear();
+        _config.Data.Datasets.Clear();
+        _chart.Update();
+    }
+
+    private List<int> RandomScalingFactor(int count)
+    {
+        return Enumerable.Range(0, count).Select(_ => _rng.Next(0, 100)).ToList();
+    }
+
+    private int RandomScalingFactor()
+    {
+        return _rng.Next(-100, 100); // Generates a single random number between -100 and 100
+    }
+}

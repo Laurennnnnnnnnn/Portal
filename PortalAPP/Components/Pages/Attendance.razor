@@ -1,0 +1,388 @@
+﻿@page "/attendance"
+
+
+@using ApplicationLayer.Services
+@using Blazored.Toast.Services
+@using DomainLayer.Entities
+@using DomainLayer.Models
+@using NetcodeHub.Packages.Components.Validations.OnInput
+@using Microsoft.AspNetCore.Components.QuickGrid
+@inject IToastService toastService
+@inject IAttendanceService atten
+@inject ICacheService CacheService
+
+<div class="h-100">
+    <div class="row" style="height: 8%;">
+        <div class="row h-auto">
+            <div class="col d-flex justify-content-center align-items-center">
+                <div class="w-50">
+                    <input type="month" class="form-control" @oninput="SelectedMonthChange" @bind="selectedMonth" />
+                </div>
+                <div class="w-50"></div>
+            </div>
+            <div class="col d-flex justify-content-center align-items-center">
+                <div>
+                    <button class="btn btn-primary" @onclick="() => PreviousMonth()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-caret-left-fill" viewBox="0 0 16 16">
+                            <path d="m3.86 8.753 5.482 4.796c.646.566 1.658.106 1.658-.753V3.204a1 1 0 0 0-1.659-.753l-5.48 4.796a1 1 0 0 0 0 1.506z" />
+                        </svg>
+                    </button>
+                    <label class="mx-5"> @selectedMonth.ToString("MMMM") </label>
+                    <button class="btn btn-primary" @onclick="() => NextMonth()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-caret-right-fill" viewBox="0 0 16 16">
+                            <path d="m12.14 8.753-5.482 4.796c-.646.566-1.658.106-1.658-.753V3.204a1 1 0 0 1 1.659-.753l5.48 4.796a1 1 0 0 1 0 1.506z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="col"></div>
+        </div>
+    </div>
+
+    <div class="row mt-2 shadow" style="height: 87%;">
+        <div class="container h-100">
+            <div class="row h-100">
+                <div class="col h-100 px-0">
+
+                    @if (attendanceModel.Attendance == null || attendanceModel.Attendance.Count() == 0)
+                        {
+                        <img src="/images/no_data.jpg" class="d-block my-0 mx-auto mw-100 mh-100 h-100" />
+                        }
+                        else
+                        {
+                                <div class="mh-100 h-100 table-responsive overflow-auto m-auto w-100">
+                                <table class="table table-bordered table-hover  w-100">
+                                    <thead>
+                                        <tr class="header-stick">
+                                            <th class="name-stick name-header">Name</th>
+                                            @foreach (var item in dates)
+                                            {
+                                                <th class="date-header text-center">@(DateTime.Parse(item).ToString("dd"))<br />@(DateTime.Parse(item).ToString("ddd"))</th>
+                                            }
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in attendanceModel.Attendance)
+                                        {
+                                            totalcount = 0;
+                                            <tr>
+                                                <td>@($"{item.Lastname}, {item.Firstname} {item.Middlename}")</td>
+                                                @if (item.AttendanceOutput != null)
+                                                {
+                                                    foreach (var keys in item.AttendanceOutput)
+                                                    {
+                                                        if (keys.Value.StatusId == 1) { totalcount++; }
+                                                        <td>
+                                                            <select class="form-control" @onchange="(e) => AddUpdAttendance(e, keys.Value)">
+                                                                @foreach (var stat in status)
+                                                                {
+                                                                    var selected = item.AttendanceOutput.Values.FirstOrDefault(s => s.StatusId == stat.StatusID);
+                                                                    <option value="@stat.StatusID" selected="@((selected != null) && (stat.StatusID == keys.Value.StatusId))">@stat.StatusName.Substring(0, 1)</option>
+                                                                }
+                                                            </select>
+                                                        </td>
+                                                    }
+                                                    <td>@totalcount</td>
+                                                }
+                                            </tr>
+                                        }
+
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        }
+                   
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row" style="height: 5%;">
+        <div class="row h-auto">
+            <div class="legend d-flex flex-row mt-2">
+                @foreach (var item in status)
+                {
+                    <div class="legend-item me-4" style="display: flex; align-items: center; margin-bottom: 5px;">
+                        @* <div class="color-box" style="width: 20px; height: 20px; background-color: @item.Color; margin-right: 10px;"></div> *@
+                        <span>@(item.StatusName.Substring(0, 1)) - @(item.StatusName)</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="position-fixed btnadd">
+    <button class="btn btn-primary btn-studentadd" data-bs-target="#attendancedates" data-bs-toggle="modal">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-person-fill-add" viewBox="0 0 16 16">
+            <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0" />
+            <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4" />
+        </svg>
+    </button>
+</div>
+
+<div class="modal fade" id="attendancedates" aria-hidden="true" aria-labelledby="attendancedatesLabel" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="attendancedatesLabel">Add Attendance Dates</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" @onclick="() => ResetDates()" aria-label="Close"></button>
+            </div>
+            <div class="modal-body h-100 justify-content-evenly">
+                <div class="row">
+                    <div class="col m-auto">
+                        <label class="form-label">From</label>
+                        <input type="date" class="form-control" @bind="dateFrom" />
+                    </div>
+                    <div class="col m-auto">
+                        <label class="form-label">To</label>
+                        <input type="date" class="form-control" @bind="dateTo" />
+                    </div>
+
+
+                </div>
+                <div class="row  mt-3">
+                    <div>
+                        <input type="checkbox" id="customdate" @bind="isCustomDate">
+                        <label for="customdate">Custom Date</label>
+                    </div>
+                </div>
+                @if (isCustomDate)
+                {
+                    <div class="row">
+                        <div class="col m-auto top-0">
+                            <label class="form-label">Select Week</label>
+                            <input type="week" class="form-control" @bind="selectedWeek" />
+                        </div>
+                        <div class="col m-auto mt-3 d-flex flex-column">
+                            @foreach (var day in weekdays)
+                            {
+                                <div>
+                                    <input type="checkbox" id="@day.Day" @bind="day.IsChecked">
+                                    <label for="@day.Day">@day.Day</label>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal" @onclick="() => AddSelectedDates()">Save Selection</button>
+            </div>
+        </div>
+    </div>
+</div>
+@code {
+    AttendanceModel attendanceModel = new();
+    List<string> dates = new();
+    private int totalcount = 0;
+    List<Status> status = new();
+    private DateTime dateFrom = DateTime.Today;
+    private DateTime dateTo = DateTime.Today;
+    private bool isCustomDate = false;
+    List<DayOfWeekCheck> weekdays = new();
+    private string selectedWeek;
+    private DateTime selectedMonth = DateTime.Now;
+    private User _userData;
+    private Class _classData;
+
+    public Class ClassData
+    {
+        get { return _classData; }
+        set { _classData = value; }
+    }
+
+    public User UserData
+    {
+        get { return _userData; }
+        set { _userData = value; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        RetrieveFromCache<User>("User", userData => UserData = userData);
+        RetrieveFromCache<Class>("Class", classData => ClassData = classData);
+
+        var latest = await atten.GetLatestAttendanceDateAsync(ClassData.ClassID);
+        selectedMonth = latest.IsSuccess ? DateTime.Parse(latest.Data.LatestDate) : DateTime.Today;
+        var result = await atten.GetAllStudentsAttendanceAsync(ClassData.ClassID, selectedMonth.ToString("MM/dd/yyyy"));
+        attendanceModel = result.Attendance != null ? result : new AttendanceModel();
+        var data = await atten.GetAttendanceDatesAsync(ClassData.ClassID, selectedMonth.ToString("MM/dd/yyyy"));
+        if (data.IsSuccess) dates = data.Data;
+        var statusdata = await atten.GetAllStatusAsync();
+        if (statusdata.IsSuccess) status = statusdata.Data;
+        GetDays();
+    }
+    async Task AddUpdAttendance(ChangeEventArgs e, AttendanceOutput attendance)
+    {
+        if (e.Value != null)
+        {
+            if (int.TryParse(e.Value.ToString(), out int statusId))
+            {
+                attendance.StatusId = statusId;
+                var data = await atten.AddUpdateAttendanceAsync(attendance, UserData.UserID);
+                await Load();
+            }
+            else
+            {
+                toastService.ShowError("Invalid status ID");
+            }
+        }
+    }
+
+    async Task Load()
+    {
+        var latest = await atten.GetLatestAttendanceDateAsync(ClassData.ClassID);
+        attendanceModel = await atten.GetAllStudentsAttendanceAsync(ClassData.ClassID, selectedMonth.ToString("MM/dd/yyyy"));
+        var data = await atten.GetAttendanceDatesAsync(ClassData.ClassID, selectedMonth.ToString("MM/dd/yyyy"));
+        if (data.IsSuccess) dates = data.Data;
+        var statusdata = await atten.GetAllStatusAsync();
+        if (statusdata.IsSuccess) status = statusdata.Data;
+    }
+
+    async Task AddSelectedDates()
+    {
+        if (isCustomDate)
+        {
+            var dates = GetWeekDates(selectedWeek);
+            for (DateTime i = dates.start; i <= dates.end; i = i.AddDays(1))
+            {
+                if (!i.DayOfWeek.ToString().Equals("Saturday") && !i.DayOfWeek.ToString().Equals("Sunday"))
+                {
+                    foreach (var day in weekdays)
+                    {
+                        if (day.IsChecked && day.Day.Equals(i.DayOfWeek))
+                        {
+                            var data = await atten.AddAttendanceDatesAsync(i.ToString("MM/dd/yyyy"), ClassData.ClassID, UserData.UserID);
+                            if (!data.Flag) { toastService.ShowError($"{data.Message} for {i.ToString("MM/dd/yyyy")}"); }
+                        }
+                    }
+
+                }
+            }
+        }
+        else
+        {
+            for (DateTime i = dateFrom; i <= dateTo; i = i.AddDays(1))
+            {
+                var data = await atten.AddAttendanceDatesAsync(i.ToString("MM/dd/yyyy"),ClassData.ClassID,  UserData.UserID);
+                if (!data.Flag) { toastService.ShowError($"{data.Message} for {i.ToString("MM/dd/yyyy")}"); }
+            }
+        }
+        ResetDates();
+        await Load();
+
+    }
+
+    void GetDays()
+    {
+        foreach (DayOfWeek day in Enum.GetValues(typeof(DayOfWeek)))
+        {
+            var data = new DayOfWeekCheck()
+                {
+                    Day = day,
+                    IsChecked = false
+                };
+            if (!data.Day.ToString().Equals("Saturday") && !data.Day.ToString().Equals("Sunday")) { weekdays.Add(data); }
+
+        }
+    }
+    private (DateTime start, DateTime end) GetWeekDates(string week)
+    {
+        var yearWeek = week.Split("-W");
+        int year = int.Parse(yearWeek[0]);
+        int weekNumber = int.Parse(yearWeek[1]);
+
+        DateTime jan1 = new DateTime(year, 1, 1);
+        int daysOffset = DayOfWeek.Thursday - jan1.DayOfWeek;
+        DateTime firstThursday = jan1.AddDays(daysOffset);
+        var calendar = System.Globalization.CultureInfo.CurrentCulture.Calendar;
+        int firstWeek = calendar.GetWeekOfYear(firstThursday, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+
+        var weekNum = weekNumber;
+        if (firstWeek <= 1)
+        {
+            weekNum -= 1;
+        }
+
+        var result = firstThursday.AddDays(weekNum * 7);
+        var startOfWeek = result.AddDays(-3);
+
+        return (startOfWeek, startOfWeek.AddDays(6));
+    }
+
+    void ResetDates()
+    {
+        isCustomDate = false;
+        dateFrom = DateTime.Today;
+        dateTo = DateTime.Today;
+        weekdays.Clear();
+        GetDays();
+        selectedWeek = "";
+
+    }
+
+    async Task SelectedMonthChange(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse($"{e.Value}-01", out var parsedDate))
+        {
+            // Set the day part to 1 to get the first day of the selected month
+            parsedDate = new DateTime(parsedDate.Year, parsedDate.Month, 1);
+
+            // Update the selected month
+            selectedMonth = parsedDate;
+
+            // Convert the DateTime to the desired string format
+            var selectedMonthString = selectedMonth.ToString("MM/dd/yyyy");
+            await OnMonthChange(selectedMonthString);
+
+        }
+    }
+    async Task OnMonthChange(string month)
+    {
+        var check = await atten.AttendanceDataCheckAsync(month, ClassData.ClassID);
+        if (check.Flag)
+        {
+            var latest = await atten.GetLatestAttendanceDateAsync(ClassData.ClassID);
+            attendanceModel = await atten.GetAllStudentsAttendanceAsync(ClassData.ClassID, month);
+            var data = await atten.GetAttendanceDatesAsync(ClassData.ClassID, month);
+            if (data.IsSuccess) dates = data.Data;
+            var statusdata = await atten.GetAllStatusAsync();
+            if (statusdata.IsSuccess) status = statusdata.Data;
+        }
+        else
+        {
+            attendanceModel = new AttendanceModel();
+            toastService.ShowError(check.Message);
+        }
+    }
+
+    async Task NextMonth()
+    {
+        var data = selectedMonth.AddMonths(1).ToString("MM/dd/yyyy");
+        await OnMonthChange(data);
+        selectedMonth = DateTime.Parse(data);
+    }
+    async Task PreviousMonth()
+    {
+        var data = selectedMonth.AddMonths(-1).ToString("MM/dd/yyyy");
+        await OnMonthChange(data);
+        selectedMonth = DateTime.Parse(data);
+    }
+
+    public class DayOfWeekCheck
+    {
+        public DayOfWeek Day { get; set; }
+        public bool IsChecked { get; set; }
+    }
+    void RetrieveFromCache<T>(string key, Action<T> onSuccess)
+    {
+        if (CacheService.TryGetValue<T>(key, out var data))
+        {
+            onSuccess(data);
+        }
+    }
+
+}

@@ -1,0 +1,125 @@
+﻿@page "/home"
+@using ApplicationLayer.Services
+@using DomainLayer.Entities
+@using NetcodeHub.Packages.Components.Validations.OnInput
+@inject IStudentService stu
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+<div class="row">
+    <div class="col-lg-6 col-sm-12">
+        <EditForm Model="student">
+            <DataAnnotationsValidator/>
+            <FloatingText @bind-Value="student.Lastname" class="form-control" Label="Lastname" PlacePlaceholder="John Doe"></FloatingText>
+            <FloatingText @bind-Value="student.Firstname" class="form-control" Label="Firstname" PlacePlaceholder="John Doe"></FloatingText>
+            <FloatingText @bind-Value="student.Middlename" class="form-control" Label="Middlename" PlacePlaceholder="John Doe"></FloatingText>
+            <FloatingText @bind-Value="student.Gender" class="form-control" Label="Gender" PlacePlaceholder="John Doe"></FloatingText>
+            <FloatingText @bind-Value="student.Birthdate" class="form-control" Label="Birthdate" PlacePlaceholder="John Doe"></FloatingText>
+            <FloatingText @bind-Value="student.LRN" class="form-control" Label="LRN" PlacePlaceholder="John Doe"></FloatingText>
+
+            <button class="btn btn-primary mt-5 mb-5" type="submit">Save</button>
+        </EditForm>
+    </div>
+    <div class="col-lg-6 col-sm-12">
+        <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>LRN</th>
+                        <th>Contact</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if(studentlist is not null)
+                    {
+                        foreach (var item in studentlist)
+                        {
+                            <tr>
+                                <td>@item.Lastname </td>
+                                <td>@item.LRN</td>
+                                <td>@item.StudentID</td>
+                                <td class="btn btn-info btn-sm" @onclick="() => DeleteFromClass(item)">Delete</td>
+                                <td class="btn btn-info btn-sm" @onclick="() => ViewStudent(item)">View</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        
+    </div>
+</div>
+
+<button class="btn btn-primary" @onclick="Load">Save</button>
+@code{
+
+    Student student = new();
+    List<Student> studentlist = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        var data = await stu.GetAllStudentsAsync(2);
+        if(data != null)
+        {
+            studentlist.Clear();
+            foreach (var item in data.Data)
+            {
+                var newstudent = new Student()
+                    {
+                        StudentID = item.StudentId,
+                        Lastname = item.Lastname,
+                        Firstname = item.Firstname,
+                        Middlename = item.Middlename,
+                        Gender = item.Gender,
+                        Birthdate = item.Birthdate,
+                        Remarks = item.Remarks,
+                        LRN = item.Lrn,
+                        CreatorID = item.CreatorId
+
+                    };
+                studentlist.Add(newstudent);
+            }
+        }
+    }
+
+     async Task Load()
+    {
+
+        var data = await stu.GetAllStudentsAsync(2);
+        if(data != null)
+        {
+            studentlist.Clear();
+            foreach (var item in data.Data)
+            {
+                var newstudent = new Student()
+                    {
+                        StudentID = item.StudentId,
+                        Lastname = item.Lastname,
+                        Firstname = item.Firstname,
+                        Middlename = item.Middlename,
+                        Gender = item.Gender,
+                        Birthdate = item.Birthdate,
+                        Remarks = item.Remarks,
+                        LRN = item.Lrn,
+                        CreatorID = item.CreatorId
+
+                    };
+                studentlist.Add(newstudent);
+            }
+        }
+    }
+    async Task DeleteFromClass(Student data)
+    {
+        var result = await stu.DeleteStudentFromClassAsync(data.StudentID, 2, 1);
+        await Load();
+    }
+
+    async Task ViewStudent(Student data)
+    {
+        var result = await stu.GetStudentFromClassByIdAsync(data.StudentID, 2);
+    }
+
+}
